@@ -1,0 +1,9 @@
+{
+  "engagement_id": "CASE-DEMO-001",
+  "requester": "acme-agent-demo",
+  "target": "Acme Agent Platform",
+  "scope": ["declared source metadata", "declared policy metadata", "synthetic evidence records"],
+  "pass_type": "posture",
+  "authority_level": "inspection-only",
+  "constraints": ["synthetic-only", "no raw evidence", "no mutation", "no active testing"]
+}

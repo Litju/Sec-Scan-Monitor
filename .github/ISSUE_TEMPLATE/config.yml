@@ -1,0 +1,5 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Private security report
+    url: https://github.com/Litju/Sec-Scan-Monitor/security/advisories/new
+    about: Do not disclose vulnerabilities, credentials, personal data, or raw evidence in a public issue.

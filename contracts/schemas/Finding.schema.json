@@ -1,0 +1,81 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://secscanmonitor.local/contracts/schemas/Finding.schema.json",
+  "title": "Finding",
+  "description": "Canonical policy-relevant issue or observation.",
+  "type": "object",
+  "additionalProperties": false,
+  "x-producer": "python-deterministic-analysis-layer",
+  "x-persisted": true,
+  "properties": {
+    "contract_version": {
+      "type": "string",
+      "description": "Contract version identifier for the Finding schema instance.",
+      "x-trust-level": "derived-deterministic"
+    },
+    "finding_id": {
+      "type": "string",
+      "description": "Stable identifier for the finding.",
+      "x-trust-level": "derived-deterministic"
+    },
+    "asset_id": {
+      "type": "string",
+      "description": "Identifier of the asset associated with the finding.",
+      "x-trust-level": "derived-deterministic"
+    },
+    "category": {
+      "type": "string",
+      "description": "Canonical category assigned to the finding.",
+      "x-trust-level": "derived-deterministic"
+    },
+    "title": {
+      "type": "string",
+      "description": "Human-readable finding title.",
+      "x-trust-level": "derived-deterministic"
+    },
+    "severity": {
+      "type": "string",
+      "description": "Severity classification for the finding.",
+      "enum": ["low", "medium", "high", "critical"],
+      "x-trust-level": "derived-deterministic"
+    },
+    "status": {
+      "type": "string",
+      "description": "Lifecycle status of the finding.",
+      "enum": ["open", "acknowledged", "resolved", "blocked", "unknown"],
+      "x-trust-level": "derived-deterministic"
+    },
+    "evidence_refs": {
+      "type": "array",
+      "description": "Evidence reference identifiers supporting the finding.",
+      "items": {
+        "type": "string",
+        "description": "Evidence reference identifier.",
+        "x-trust-level": "reference-only"
+      },
+      "x-trust-level": "reference-only"
+    },
+    "policy_basis": {
+      "type": "string",
+      "description": "Policy basis grounding the finding.",
+      "x-trust-level": "trusted-policy"
+    },
+    "confidence": {
+      "type": "number",
+      "description": "Deterministic confidence value for the finding.",
+      "x-trust-level": "derived-deterministic"
+    }
+  },
+  "required": [
+    "contract_version",
+    "finding_id",
+    "asset_id",
+    "category",
+    "title",
+    "severity",
+    "status",
+    "evidence_refs",
+    "policy_basis",
+    "confidence"
+  ]
+}

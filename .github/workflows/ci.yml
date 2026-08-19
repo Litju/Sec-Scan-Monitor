@@ -1,0 +1,82 @@
+name: Public CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: public-ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  python:
+    name: Python
+    runs-on: ubuntu-latest
+    steps:
+      - name: Harden runner
+        uses: step-security/harden-runner@05e31511f85b41b11d1cf0ef85d0992719546e2c
+        with:
+          egress-policy: audit
+      - name: Checkout
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+      - name: Set up Python
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
+        with:
+          python-version: "3.12"
+      - name: Install
+        working-directory: analysis
+        run: |
+          python -m pip install --disable-pip-version-check --require-hashes -r requirements.lock
+          python -m pip install --disable-pip-version-check --no-deps -e .
+      - name: Test
+        working-directory: analysis
+        run: python -m pytest -q
+      - name: Typecheck
+        working-directory: analysis
+        run: python -m mypy src
+      - name: Lint
+        working-directory: analysis
+        run: python -m ruff check src tests
+
+  web:
+    name: Web
+    runs-on: ubuntu-latest
+    steps:
+      - name: Harden runner
+        uses: step-security/harden-runner@05e31511f85b41b11d1cf0ef85d0992719546e2c
+        with:
+          egress-policy: audit
+      - name: Checkout
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+      - name: Set up Node
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: apps/web/package-lock.json
+      - name: Install
+        working-directory: apps/web
+        run: npm ci
+      - name: Unit tests
+        working-directory: apps/web
+        run: npm test
+      - name: Typecheck
+        working-directory: apps/web
+        run: npm run typecheck
+      - name: Lint
+        working-directory: apps/web
+        run: npm run lint
+      - name: Build
+        working-directory: apps/web
+        run: npm run build
+      - name: Install browser
+        working-directory: apps/web
+        run: npx playwright install --with-deps chromium
+      - name: Accessibility and product flow
+        working-directory: apps/web
+        run: npx playwright test tests/e2e/accessibility.spec.ts tests/e2e/product-surface.spec.ts

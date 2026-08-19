@@ -1,0 +1,62 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://secscanmonitor.local/contracts/schemas/HostPostureSummary.schema.json",
+  "title": "HostPostureSummary",
+  "description": "Deterministic per-host posture summary for overview and detail views.",
+  "type": "object",
+  "additionalProperties": false,
+  "x-producer": "python-deterministic-analysis-layer",
+  "x-persisted": true,
+  "properties": {
+    "contract_version": {
+      "type": "string",
+      "description": "Contract version identifier for the HostPostureSummary schema instance.",
+      "x-trust-level": "derived-deterministic"
+    },
+    "asset_id": {
+      "type": "string",
+      "description": "Identifier of the asset summarized by the record.",
+      "x-trust-level": "derived-deterministic"
+    },
+    "posture_status": {
+      "type": "string",
+      "description": "Deterministic posture status for the host.",
+      "enum": ["healthy", "warning", "critical", "unknown"],
+      "x-trust-level": "derived-deterministic"
+    },
+    "risk_score": {
+      "type": "number",
+      "description": "Current deterministic risk score for the host.",
+      "x-trust-level": "derived-deterministic"
+    },
+    "open_findings": {
+      "type": "integer",
+      "description": "Count of open findings for the host.",
+      "x-trust-level": "derived-deterministic"
+    },
+    "recent_delta_count": {
+      "type": "integer",
+      "description": "Count of recent deltas associated with the host.",
+      "x-trust-level": "derived-deterministic"
+    },
+    "top_blockers": {
+      "type": "array",
+      "description": "Top blocker descriptions associated with the host posture.",
+      "items": {
+        "type": "string",
+        "description": "Blocker description.",
+        "x-trust-level": "derived-deterministic"
+      },
+      "x-trust-level": "derived-deterministic"
+    }
+  },
+  "required": [
+    "contract_version",
+    "asset_id",
+    "posture_status",
+    "risk_score",
+    "open_findings",
+    "recent_delta_count",
+    "top_blockers"
+  ]
+}

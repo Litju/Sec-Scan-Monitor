@@ -1,0 +1,61 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://secscanmonitor.local/contracts/schemas/PhaseState.schema.json",
+  "title": "PhaseState",
+  "description": "Canonical representation of current phase and promotion state.",
+  "type": "object",
+  "additionalProperties": false,
+  "x-producer": "python-deterministic-analysis-layer",
+  "x-persisted": true,
+  "properties": {
+    "contract_version": {
+      "type": "string",
+      "description": "Contract version identifier for the PhaseState schema instance.",
+      "x-trust-level": "derived-deterministic"
+    },
+    "current_phase": {
+      "type": "string",
+      "description": "Current security phase label.",
+      "x-trust-level": "trusted-policy"
+    },
+    "phase_label": {
+      "type": "string",
+      "description": "Human-readable label for the current phase.",
+      "x-trust-level": "trusted-policy"
+    },
+    "promotion_status": {
+      "type": "string",
+      "description": "Promotion eligibility status for the current phase.",
+      "enum": ["not-yet", "blocked", "eligible", "approved"],
+      "x-trust-level": "derived-deterministic"
+    },
+    "blockers": {
+      "type": "array",
+      "description": "Blocker identifiers or descriptions associated with promotion status.",
+      "items": {
+        "type": "string",
+        "description": "Blocker identifier or description.",
+        "x-trust-level": "derived-deterministic"
+      },
+      "x-trust-level": "derived-deterministic"
+    },
+    "policy_sources": {
+      "type": "array",
+      "description": "Policy sources used to determine phase state.",
+      "items": {
+        "type": "string",
+        "description": "Policy source identifier.",
+        "x-trust-level": "trusted-policy"
+      },
+      "x-trust-level": "trusted-policy"
+    }
+  },
+  "required": [
+    "contract_version",
+    "current_phase",
+    "phase_label",
+    "promotion_status",
+    "blockers",
+    "policy_sources"
+  ]
+}

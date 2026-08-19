@@ -1,0 +1,69 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://secscanmonitor.local/contracts/schemas/Asset.schema.json",
+  "title": "Asset",
+  "description": "Canonical representation of an observed asset.",
+  "type": "object",
+  "additionalProperties": false,
+  "x-producer": "python-deterministic-analysis-layer",
+  "x-persisted": true,
+  "properties": {
+    "contract_version": {
+      "type": "string",
+      "description": "Contract version identifier for the Asset schema instance.",
+      "x-trust-level": "derived-deterministic"
+    },
+    "asset_id": {
+      "type": "string",
+      "description": "Stable identifier for the observed asset.",
+      "x-trust-level": "derived-deterministic"
+    },
+    "hostname": {
+      "type": "string",
+      "description": "Hostname associated with the asset.",
+      "x-trust-level": "derived-deterministic"
+    },
+    "asset_role": {
+      "type": "string",
+      "description": "Approved role classification for the asset.",
+      "enum": ["workstation", "laptop", "phone-anchor", "edge-device", "other"],
+      "x-trust-level": "derived-deterministic"
+    },
+    "trust_zone": {
+      "type": "string",
+      "description": "Trust-zone label assigned to the asset.",
+      "x-trust-level": "derived-deterministic"
+    },
+    "platform": {
+      "type": "string",
+      "description": "Platform description for the asset.",
+      "x-trust-level": "derived-deterministic"
+    },
+    "posture_status": {
+      "type": "string",
+      "description": "Deterministic posture status for the asset.",
+      "enum": ["healthy", "warning", "critical", "unknown"],
+      "x-trust-level": "derived-deterministic"
+    },
+    "latest_evidence_refs": {
+      "type": "array",
+      "description": "References to the most recent evidence items for the asset.",
+      "items": {
+        "type": "string",
+        "description": "Evidence reference identifier.",
+        "x-trust-level": "reference-only"
+      },
+      "x-trust-level": "reference-only"
+    }
+  },
+  "required": [
+    "contract_version",
+    "asset_id",
+    "hostname",
+    "asset_role",
+    "trust_zone",
+    "platform",
+    "posture_status",
+    "latest_evidence_refs"
+  ]
+}

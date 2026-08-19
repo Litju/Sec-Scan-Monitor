@@ -1,0 +1,45 @@
+{
+  "evidence_objects": [
+    {
+      "evidence_id": "EVID-DEMO-001",
+      "kind": "policy-metadata",
+      "source": "acme-agent-demo/policy.yaml",
+      "sha256": "synthetic-digest-001",
+      "sanitization": "metadata-only"
+    },
+    {
+      "evidence_id": "EVID-DEMO-002",
+      "kind": "authority-reference",
+      "source": "acme-agent-demo/authority-map.yaml",
+      "sha256": "synthetic-digest-002",
+      "sanitization": "metadata-only"
+    }
+  ],
+  "observations": [
+    {
+      "observation_id": "OBS-DEMO-001",
+      "evidence_ids": ["EVID-DEMO-001"],
+      "statement": "The declared policy requires approval for target mutation."
+    }
+  ],
+  "claims": [
+    {
+      "claim_id": "CLAIM-DEMO-001",
+      "observation_ids": ["OBS-DEMO-001"],
+      "evidence_ids": ["EVID-DEMO-001"],
+      "statement": "The mutation approval boundary is declared, but its runtime enforcement is not established by this fixture.",
+      "confidence": "low",
+      "uncertainty": "Runtime adapter evidence is absent."
+    }
+  ],
+  "adjudications": [
+    {
+      "adjudication_id": "ADJ-DEMO-001",
+      "claim_ids": ["CLAIM-DEMO-001"],
+      "verdict": "inconclusive",
+      "confidence": "low",
+      "rationale": "The declaration is present, but the execution path and authority reference are incomplete."
+    }
+  ],
+  "findings": []
+}

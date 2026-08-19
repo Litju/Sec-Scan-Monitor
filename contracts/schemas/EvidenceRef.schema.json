@@ -1,0 +1,64 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://secscanmonitor.local/contracts/schemas/EvidenceRef.schema.json",
+  "title": "EvidenceRef",
+  "description": "Typed reference to evidence provenance without embedding arbitrary raw evidence.",
+  "type": "object",
+  "additionalProperties": false,
+  "x-producer": "python-deterministic-analysis-layer",
+  "x-persisted": true,
+  "properties": {
+    "contract_version": {
+      "type": "string",
+      "description": "Contract version identifier for the EvidenceRef schema instance.",
+      "x-trust-level": "derived-deterministic"
+    },
+    "evidence_ref_id": {
+      "type": "string",
+      "description": "Stable identifier for the evidence reference.",
+      "x-trust-level": "derived-deterministic"
+    },
+    "source_collector": {
+      "type": "string",
+      "description": "Approved collector name that produced the evidence.",
+      "x-trust-level": "derived-deterministic"
+    },
+    "evidence_kind": {
+      "type": "string",
+      "description": "Kind classification for the evidence artifact.",
+      "x-trust-level": "derived-deterministic"
+    },
+    "captured_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Timestamp at which the evidence was captured.",
+      "x-trust-level": "derived-deterministic"
+    },
+    "local_path_hint": {
+      "type": "string",
+      "description": "Local-only path hint for evidence provenance.",
+      "x-trust-level": "reference-only"
+    },
+    "hash_sha256": {
+      "type": "string",
+      "description": "SHA-256 hash of the referenced evidence.",
+      "x-trust-level": "derived-deterministic"
+    },
+    "sensitivity": {
+      "type": "string",
+      "description": "Sensitivity classification for the evidence reference.",
+      "enum": ["local-sensitive", "sanitized-reference"],
+      "x-trust-level": "trusted-policy"
+    }
+  },
+  "required": [
+    "contract_version",
+    "evidence_ref_id",
+    "source_collector",
+    "evidence_kind",
+    "captured_at",
+    "local_path_hint",
+    "hash_sha256",
+    "sensitivity"
+  ]
+}

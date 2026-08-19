@@ -1,0 +1,56 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://secscanmonitor.local/contracts/schemas/OperatorDigest.schema.json",
+  "title": "OperatorDigest",
+  "description": "Operator-facing advisory digest composed from runtime agent outputs.",
+  "type": "object",
+  "additionalProperties": false,
+  "x-producer": "echo-runtime-advisory-agent",
+  "x-persisted": false,
+  "properties": {
+    "contract_version": {
+      "type": "string",
+      "description": "Contract version identifier for the OperatorDigest schema instance.",
+      "x-trust-level": "advisory-transient"
+    },
+    "title": {
+      "type": "string",
+      "description": "Digest title.",
+      "x-trust-level": "advisory-transient"
+    },
+    "summary": {
+      "type": "string",
+      "description": "Digest summary text.",
+      "x-trust-level": "advisory-transient"
+    },
+    "blockers": {
+      "type": "array",
+      "description": "Blockers included in the advisory digest.",
+      "items": {
+        "$ref": "./PromotionBlocker.schema.json"
+      },
+      "x-trust-level": "advisory-transient"
+    },
+    "recommended_actions": {
+      "type": "array",
+      "description": "Recommended actions included in the advisory digest.",
+      "items": {
+        "$ref": "./RecommendedAction.schema.json"
+      },
+      "x-trust-level": "advisory-transient"
+    },
+    "confidence": {
+      "type": "number",
+      "description": "Advisory confidence value for the digest.",
+      "x-trust-level": "advisory-transient"
+    }
+  },
+  "required": [
+    "contract_version",
+    "title",
+    "summary",
+    "blockers",
+    "recommended_actions",
+    "confidence"
+  ]
+}

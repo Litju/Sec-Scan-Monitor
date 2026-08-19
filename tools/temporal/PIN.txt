@@ -1,0 +1,10 @@
+# Temporal CLI pin (supply-chain law: pin versions, verify integrity)
+version: v1.8.2 (Server 1.31.2, UI 2.50.1)
+platform: windows_amd64
+url: https://github.com/temporalio/cli/releases/download/v1.8.2/temporal_cli_1.8.2_windows_amd64.zip
+fetched: 2026-08-14
+notes:
+  - Used for TEMPORAL_LIVE_SERVER qualification smoke (server start-dev on 127.0.0.1:7233).
+  - temporalite is deprecated upstream; the Temporal CLI dev server is the current path.
+  - Do not float to 'latest': re-pin deliberately. Release does not publish checksums;
+    pin by exact version tag and record the server version string.

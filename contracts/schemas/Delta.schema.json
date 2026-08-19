@@ -1,0 +1,68 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://secscanmonitor.local/contracts/schemas/Delta.schema.json",
+  "title": "Delta",
+  "description": "Canonical record of change between prior and current state.",
+  "type": "object",
+  "additionalProperties": false,
+  "x-producer": "python-deterministic-analysis-layer",
+  "x-persisted": true,
+  "properties": {
+    "contract_version": {
+      "type": "string",
+      "description": "Contract version identifier for the Delta schema instance.",
+      "x-trust-level": "derived-deterministic"
+    },
+    "delta_id": {
+      "type": "string",
+      "description": "Stable identifier for the delta record.",
+      "x-trust-level": "derived-deterministic"
+    },
+    "asset_id": {
+      "type": "string",
+      "description": "Identifier of the asset associated with the delta.",
+      "x-trust-level": "derived-deterministic"
+    },
+    "category": {
+      "type": "string",
+      "description": "Canonical delta category.",
+      "x-trust-level": "derived-deterministic"
+    },
+    "prior_value": {
+      "type": "string",
+      "description": "Prior canonical value.",
+      "x-trust-level": "derived-deterministic"
+    },
+    "current_value": {
+      "type": "string",
+      "description": "Current canonical value.",
+      "x-trust-level": "derived-deterministic"
+    },
+    "detected_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Timestamp when the delta was detected.",
+      "x-trust-level": "derived-deterministic"
+    },
+    "evidence_refs": {
+      "type": "array",
+      "description": "Evidence reference identifiers supporting the delta.",
+      "items": {
+        "type": "string",
+        "description": "Evidence reference identifier.",
+        "x-trust-level": "reference-only"
+      },
+      "x-trust-level": "reference-only"
+    }
+  },
+  "required": [
+    "contract_version",
+    "delta_id",
+    "asset_id",
+    "category",
+    "prior_value",
+    "current_value",
+    "detected_at",
+    "evidence_refs"
+  ]
+}

@@ -1,0 +1,107 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://secscanmonitor.local/contracts/schemas/AgentInputContract.schema.json",
+  "title": "AgentInputContract",
+  "description": "Sanitized typed input package for the runtime advisory swarm.",
+  "type": "object",
+  "additionalProperties": false,
+  "x-producer": "python-deterministic-analysis-layer",
+  "x-persisted": false,
+  "properties": {
+    "contract_version": {
+      "type": "string",
+      "description": "Contract version identifier for the AgentInputContract schema instance.",
+      "x-trust-level": "derived-deterministic"
+    },
+    "generated_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Timestamp when the advisory input contract was generated.",
+      "x-trust-level": "derived-deterministic"
+    },
+    "phase_state": {
+      "$ref": "./PhaseState.schema.json",
+      "description": "Canonical phase state included in advisory input.",
+      "x-trust-level": "derived-deterministic"
+    },
+    "assets": {
+      "type": "array",
+      "description": "Canonical asset records exposed to the advisory swarm.",
+      "items": {
+        "$ref": "./Asset.schema.json"
+      },
+      "x-trust-level": "derived-deterministic"
+    },
+    "findings": {
+      "type": "array",
+      "description": "Canonical findings exposed to the advisory swarm.",
+      "items": {
+        "$ref": "./Finding.schema.json"
+      },
+      "x-trust-level": "derived-deterministic"
+    },
+    "deltas": {
+      "type": "array",
+      "description": "Canonical delta records exposed to the advisory swarm.",
+      "items": {
+        "$ref": "./Delta.schema.json"
+      },
+      "x-trust-level": "derived-deterministic"
+    },
+    "risk_scores": {
+      "type": "array",
+      "description": "Canonical risk scores exposed to the advisory swarm.",
+      "items": {
+        "$ref": "./RiskScore.schema.json"
+      },
+      "x-trust-level": "derived-deterministic"
+    },
+    "runbook_refs": {
+      "type": "array",
+      "description": "Approved runbook references exposed to the advisory swarm.",
+      "items": {
+        "$ref": "./RunbookRef.schema.json"
+      },
+      "x-trust-level": "trusted-policy"
+    },
+    "exposure_summaries": {
+      "type": "array",
+      "description": "Deterministic exposure summaries exposed to the advisory swarm.",
+      "items": {
+        "$ref": "./ExposureSummary.schema.json"
+      },
+      "x-trust-level": "derived-deterministic"
+    },
+    "host_posture_summaries": {
+      "type": "array",
+      "description": "Per-host posture summaries exposed to the advisory swarm.",
+      "items": {
+        "$ref": "./HostPostureSummary.schema.json"
+      },
+      "x-trust-level": "derived-deterministic"
+    },
+    "sanitization_notes": {
+      "type": "array",
+      "description": "Notes describing exclusions and sanitization decisions.",
+      "items": {
+        "type": "string",
+        "description": "Sanitization note.",
+        "x-trust-level": "derived-deterministic"
+      },
+      "x-trust-level": "derived-deterministic"
+    }
+  },
+  "required": [
+    "contract_version",
+    "generated_at",
+    "phase_state",
+    "assets",
+    "findings",
+    "deltas",
+    "risk_scores",
+    "runbook_refs",
+    "exposure_summaries",
+    "host_posture_summaries",
+    "sanitization_notes"
+  ]
+}

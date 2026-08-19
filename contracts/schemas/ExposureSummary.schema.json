@@ -1,0 +1,55 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://secscanmonitor.local/contracts/schemas/ExposureSummary.schema.json",
+  "title": "ExposureSummary",
+  "description": "Deterministic summary of current externally relevant exposure posture.",
+  "type": "object",
+  "additionalProperties": false,
+  "x-producer": "python-deterministic-analysis-layer",
+  "x-persisted": true,
+  "properties": {
+    "contract_version": {
+      "type": "string",
+      "description": "Contract version identifier for the ExposureSummary schema instance.",
+      "x-trust-level": "derived-deterministic"
+    },
+    "scope_id": {
+      "type": "string",
+      "description": "Identifier for the scope summarized by the exposure record.",
+      "x-trust-level": "derived-deterministic"
+    },
+    "externally_reachable_count": {
+      "type": "integer",
+      "description": "Count of externally reachable services or endpoints.",
+      "x-trust-level": "derived-deterministic"
+    },
+    "sensitive_service_count": {
+      "type": "integer",
+      "description": "Count of sensitive services included in the scope.",
+      "x-trust-level": "derived-deterministic"
+    },
+    "blocked_execution_note": {
+      "type": "string",
+      "description": "Deterministic note describing blocked execution or unavailable checks.",
+      "x-trust-level": "derived-deterministic"
+    },
+    "evidence_refs": {
+      "type": "array",
+      "description": "Evidence reference identifiers supporting the summary.",
+      "items": {
+        "type": "string",
+        "description": "Evidence reference identifier.",
+        "x-trust-level": "reference-only"
+      },
+      "x-trust-level": "reference-only"
+    }
+  },
+  "required": [
+    "contract_version",
+    "scope_id",
+    "externally_reachable_count",
+    "sensitive_service_count",
+    "blocked_execution_note",
+    "evidence_refs"
+  ]
+}

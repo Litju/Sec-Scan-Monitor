@@ -1,0 +1,103 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://secscanmonitor.local/contracts/schemas/RejectedAgentOutputLog.schema.json",
+  "title": "RejectedAgentOutputLog",
+  "description": "Transient advisory-security telemetry emitted when the advisory containment gate rejects unsafe or invalid runtime advisory output. This log is not canonical truth, not a retry queue, and must contain only bounded excerpts.",
+  "type": "object",
+  "additionalProperties": false,
+  "x-producer": "advisory-containment-gate",
+  "x-persisted": false,
+  "properties": {
+    "contract_version": {
+      "type": "string",
+      "description": "Contract version identifier for the RejectedAgentOutputLog schema instance.",
+      "x-trust-level": "advisory-security-telemetry"
+    },
+    "log_id": {
+      "type": "string",
+      "description": "Stable identifier for the rejected advisory log entry.",
+      "x-trust-level": "advisory-security-telemetry"
+    },
+    "logged_at_utc": {
+      "type": "string",
+      "description": "UTC timestamp when the rejection was logged.",
+      "format": "date-time",
+      "x-trust-level": "advisory-security-telemetry"
+    },
+    "agent_name": {
+      "type": "string",
+      "description": "Runtime advisory agent whose output was rejected.",
+      "enum": [
+        "Alpha",
+        "Bravo",
+        "Delta",
+        "Echo",
+        "Foxtrot",
+        "Golf",
+        "Sierra",
+        "Papa"
+      ],
+      "x-trust-level": "advisory-security-telemetry"
+    },
+    "reason_class": {
+      "type": "string",
+      "description": "Deterministic rejection class assigned by schema validation or operator-intent classification.",
+      "enum": [
+        "UNSAFE_EXECUTION_INTENT",
+        "UNSAFE_MUTATION_INTENT",
+        "UNSAFE_AUTHORITY_CLAIM",
+        "UNSAFE_SECRET_SEEKING",
+        "UNSAFE_TOOL_ROUTING",
+        "UNSAFE_SCHEMA_VIOLATION"
+      ],
+      "x-trust-level": "advisory-security-telemetry"
+    },
+    "raw_excerpt": {
+      "type": "string",
+      "description": "Short bounded excerpt of the raw advisory response, with no secrets or raw evidence content.",
+      "maxLength": 500,
+      "x-trust-level": "advisory-security-telemetry"
+    },
+    "parsed_excerpt": {
+      "type": "string",
+      "description": "Short bounded excerpt of the parsed advisory object or validation failure context, with no secrets or raw evidence content.",
+      "maxLength": 500,
+      "x-trust-level": "advisory-security-telemetry"
+    },
+    "input_ref": {
+      "type": "string",
+      "description": "Reference to the AgentInputContract instance used for the rejected advisory attempt.",
+      "x-trust-level": "advisory-security-telemetry"
+    },
+    "action_taken": {
+      "type": "string",
+      "description": "Fixed action taken by the containment gate.",
+      "const": "rejected_and_logged",
+      "x-trust-level": "advisory-security-telemetry"
+    },
+    "notes": {
+      "type": "array",
+      "description": "Bounded non-secret notes about the rejection.",
+      "maxItems": 10,
+      "items": {
+        "type": "string",
+        "description": "Rejection note.",
+        "maxLength": 200,
+        "x-trust-level": "advisory-security-telemetry"
+      },
+      "x-trust-level": "advisory-security-telemetry"
+    }
+  },
+  "required": [
+    "contract_version",
+    "log_id",
+    "logged_at_utc",
+    "agent_name",
+    "reason_class",
+    "raw_excerpt",
+    "parsed_excerpt",
+    "input_ref",
+    "action_taken",
+    "notes"
+  ]
+}

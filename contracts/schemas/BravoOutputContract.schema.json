@@ -1,0 +1,46 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://secscanmonitor.local/contracts/schemas/BravoOutputContract.schema.json",
+  "title": "BravoOutputContract",
+  "description": "Policy interpretation output.",
+  "type": "object",
+  "additionalProperties": false,
+  "x-producer": "bravo-runtime-advisory-agent",
+  "x-persisted": false,
+  "properties": {
+    "contract_version": {
+      "type": "string",
+      "description": "Contract version identifier for the BravoOutputContract schema instance.",
+      "x-trust-level": "advisory-transient"
+    },
+    "interpreted_blockers": {
+      "type": "array",
+      "description": "Promotion blockers interpreted or restated by Bravo.",
+      "items": {
+        "$ref": "./PromotionBlocker.schema.json"
+      },
+      "x-trust-level": "advisory-transient"
+    },
+    "policy_notes": {
+      "type": "array",
+      "description": "Policy interpretation notes for the operator.",
+      "items": {
+        "type": "string",
+        "description": "Policy note.",
+        "x-trust-level": "advisory-transient"
+      },
+      "x-trust-level": "advisory-transient"
+    },
+    "confidence": {
+      "type": "number",
+      "description": "Advisory confidence value for Bravo output.",
+      "x-trust-level": "advisory-transient"
+    }
+  },
+  "required": [
+    "contract_version",
+    "interpreted_blockers",
+    "policy_notes",
+    "confidence"
+  ]
+}

@@ -1,0 +1,46 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://secscanmonitor.local/contracts/schemas/SierraOutputContract.schema.json",
+  "title": "SierraOutputContract",
+  "description": "Runbook mapping output.",
+  "type": "object",
+  "additionalProperties": false,
+  "x-producer": "sierra-runtime-advisory-agent",
+  "x-persisted": false,
+  "properties": {
+    "contract_version": {
+      "type": "string",
+      "description": "Contract version identifier for the SierraOutputContract schema instance.",
+      "x-trust-level": "advisory-transient"
+    },
+    "mapped_runbooks": {
+      "type": "array",
+      "description": "Approved runbooks mapped to the current advisory context.",
+      "items": {
+        "$ref": "./RunbookRef.schema.json"
+      },
+      "x-trust-level": "advisory-transient"
+    },
+    "runbook_notes": {
+      "type": "array",
+      "description": "Runbook mapping notes for the operator.",
+      "items": {
+        "type": "string",
+        "description": "Runbook note.",
+        "x-trust-level": "advisory-transient"
+      },
+      "x-trust-level": "advisory-transient"
+    },
+    "confidence": {
+      "type": "number",
+      "description": "Advisory confidence value for Sierra output.",
+      "x-trust-level": "advisory-transient"
+    }
+  },
+  "required": [
+    "contract_version",
+    "mapped_runbooks",
+    "runbook_notes",
+    "confidence"
+  ]
+}

@@ -1,0 +1,73 @@
+[project]
+name = "secscan-analysis"
+version = "0.2.0"
+description = "SecScanMonitor firm platform: governed control plane for the agentic cybersecurity firm (case engine + platform)"
+requires-python = ">=3.12"
+dependencies = [
+  "pydantic>=2,<3",
+  "PyYAML>=6,<7",
+  "sqlalchemy>=2.0,<2.1",
+  "alembic>=1.13,<2",
+  "psycopg[binary]>=3.1,<4",
+  "fastapi>=0.111,<1",
+  "temporalio>=1.7,<2",
+  "vercel>=0.10,<0.11",
+  "PyJWT[crypto]>=2.10,<3",
+  "opentelemetry-api==1.36.0",
+  "opentelemetry-sdk==1.36.0",
+  "opentelemetry-exporter-otlp-proto-http==1.36.0",
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest>=8,<10",
+  "mypy>=1.10,<2",
+  "ruff>=0.5,<1",
+  "uvicorn>=0.30,<1",
+  "httpx>=0.27,<1",
+  "docker>=7,<8",
+  "moto[s3]>=5,<6",
+]
+s3 = [
+  # S3-compatible evidence store adapter (boto3 speaks S3 API to MinIO,
+  # Ceph, AWS, etc.). Never a canonical-suite requirement.
+  "boto3>=1.34,<2",
+]
+
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.package-dir]
+"" = "src"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+packages = ["secscan"]
+
+[tool.ruff]
+line-length = 120
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B"]
+ignore = ["E501"]
+
+[tool.ruff.lint.per-file-ignores]
+# FastAPI's canonical dependency-injection style uses Depends() in parameter
+# defaults (B008). The alternative (Annotated) is not resolved correctly for
+# closure-defined dependencies in this FastAPI version.
+"src/secscan/platform/api/app.py" = ["B008"]
+
+# Supply-chain law (2026-08 security review): requirements.lock is the
+# canonical pin set for the dev environment — ranges in this file float,
+# the lock does not. Regenerate after dependency changes:
+#   uv pip compile pyproject.toml --all-extras --universal --generate-hashes \
+#     --python-version 3.12 --output-file requirements.lock

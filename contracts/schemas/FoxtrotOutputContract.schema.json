@@ -1,0 +1,44 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://secscanmonitor.local/contracts/schemas/FoxtrotOutputContract.schema.json",
+  "title": "FoxtrotOutputContract",
+  "description": "Evidence sufficiency and skepticism output.",
+  "type": "object",
+  "additionalProperties": false,
+  "x-producer": "foxtrot-runtime-advisory-agent",
+  "x-persisted": false,
+  "properties": {
+    "contract_version": {
+      "type": "string",
+      "description": "Contract version identifier for the FoxtrotOutputContract schema instance.",
+      "x-trust-level": "advisory-transient"
+    },
+    "sufficiency_assessment": {
+      "type": "string",
+      "description": "Assessment of evidence sufficiency.",
+      "enum": ["sufficient", "partial", "insufficient"],
+      "x-trust-level": "advisory-transient"
+    },
+    "evidence_gaps": {
+      "type": "array",
+      "description": "Evidence gaps identified by Foxtrot.",
+      "items": {
+        "type": "string",
+        "description": "Evidence gap note.",
+        "x-trust-level": "advisory-transient"
+      },
+      "x-trust-level": "advisory-transient"
+    },
+    "confidence": {
+      "type": "number",
+      "description": "Advisory confidence value for Foxtrot output.",
+      "x-trust-level": "advisory-transient"
+    }
+  },
+  "required": [
+    "contract_version",
+    "sufficiency_assessment",
+    "evidence_gaps",
+    "confidence"
+  ]
+}

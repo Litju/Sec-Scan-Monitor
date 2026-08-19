@@ -1,0 +1,55 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://secscanmonitor.local/contracts/schemas/RunbookRef.schema.json",
+  "title": "RunbookRef",
+  "description": "Typed reference to an approved runbook path and scope.",
+  "type": "object",
+  "additionalProperties": false,
+  "x-producer": "python-deterministic-analysis-layer",
+  "x-persisted": true,
+  "properties": {
+    "contract_version": {
+      "type": "string",
+      "description": "Contract version identifier for the RunbookRef schema instance.",
+      "x-trust-level": "derived-deterministic"
+    },
+    "runbook_id": {
+      "type": "string",
+      "description": "Stable identifier for the runbook reference.",
+      "x-trust-level": "derived-deterministic"
+    },
+    "title": {
+      "type": "string",
+      "description": "Runbook title.",
+      "x-trust-level": "trusted-policy"
+    },
+    "path": {
+      "type": "string",
+      "description": "Approved runbook path.",
+      "x-trust-level": "trusted-policy"
+    },
+    "applies_to_categories": {
+      "type": "array",
+      "description": "Finding categories to which the runbook applies.",
+      "items": {
+        "type": "string",
+        "description": "Applicable category label.",
+        "x-trust-level": "trusted-policy"
+      },
+      "x-trust-level": "trusted-policy"
+    },
+    "phase_scope": {
+      "type": "string",
+      "description": "Phase scope covered by the runbook.",
+      "x-trust-level": "trusted-policy"
+    }
+  },
+  "required": [
+    "contract_version",
+    "runbook_id",
+    "title",
+    "path",
+    "applies_to_categories",
+    "phase_scope"
+  ]
+}

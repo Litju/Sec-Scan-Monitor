@@ -1,0 +1,58 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://secscanmonitor.local/contracts/schemas/PromotionBlocker.schema.json",
+  "title": "PromotionBlocker",
+  "description": "Typed expression of a blocker for phase promotion.",
+  "type": "object",
+  "additionalProperties": false,
+  "x-producer": "python-deterministic-analysis-layer-or-bravo-advisory-restatement",
+  "x-persisted": true,
+  "properties": {
+    "contract_version": {
+      "type": "string",
+      "description": "Contract version identifier for the PromotionBlocker schema instance.",
+      "x-trust-level": "derived-deterministic"
+    },
+    "blocker_id": {
+      "type": "string",
+      "description": "Stable identifier for the promotion blocker.",
+      "x-trust-level": "derived-deterministic or advisory-transient"
+    },
+    "title": {
+      "type": "string",
+      "description": "Human-readable blocker title.",
+      "x-trust-level": "derived-deterministic or advisory-transient"
+    },
+    "reason": {
+      "type": "string",
+      "description": "Explanation for why promotion is blocked.",
+      "x-trust-level": "derived-deterministic or advisory-transient"
+    },
+    "source_type": {
+      "type": "string",
+      "description": "Source type for the blocker expression.",
+      "enum": ["policy", "deterministic-analysis", "advisory-restatement"],
+      "x-trust-level": "derived-deterministic"
+    },
+    "severity": {
+      "type": "string",
+      "description": "Severity classification for the blocker.",
+      "enum": ["low", "medium", "high", "critical"],
+      "x-trust-level": "derived-deterministic"
+    },
+    "runbook_ref_id": {
+      "type": "string",
+      "description": "Runbook reference identifier associated with the blocker.",
+      "x-trust-level": "reference-only"
+    }
+  },
+  "required": [
+    "contract_version",
+    "blocker_id",
+    "title",
+    "reason",
+    "source_type",
+    "severity",
+    "runbook_ref_id"
+  ]
+}

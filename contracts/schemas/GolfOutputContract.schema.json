@@ -1,0 +1,48 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://secscanmonitor.local/contracts/schemas/GolfOutputContract.schema.json",
+  "title": "GolfOutputContract",
+  "description": "Visual mapping guidance output.",
+  "type": "object",
+  "additionalProperties": false,
+  "x-producer": "golf-runtime-advisory-agent",
+  "x-persisted": false,
+  "properties": {
+    "contract_version": {
+      "type": "string",
+      "description": "Contract version identifier for the GolfOutputContract schema instance.",
+      "x-trust-level": "advisory-transient"
+    },
+    "suggested_views": {
+      "type": "array",
+      "description": "Suggested views or view groupings for operator presentation.",
+      "items": {
+        "type": "string",
+        "description": "Suggested view name.",
+        "x-trust-level": "advisory-transient"
+      },
+      "x-trust-level": "advisory-transient"
+    },
+    "visualization_notes": {
+      "type": "array",
+      "description": "Visualization notes produced by Golf.",
+      "items": {
+        "type": "string",
+        "description": "Visualization note.",
+        "x-trust-level": "advisory-transient"
+      },
+      "x-trust-level": "advisory-transient"
+    },
+    "confidence": {
+      "type": "number",
+      "description": "Advisory confidence value for Golf output.",
+      "x-trust-level": "advisory-transient"
+    }
+  },
+  "required": [
+    "contract_version",
+    "suggested_views",
+    "visualization_notes",
+    "confidence"
+  ]
+}

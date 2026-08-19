@@ -1,0 +1,62 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://secscanmonitor.local/contracts/schemas/RiskScore.schema.json",
+  "title": "RiskScore",
+  "description": "Deterministic risk summary for an asset or scope.",
+  "type": "object",
+  "additionalProperties": false,
+  "x-producer": "python-deterministic-analysis-layer",
+  "x-persisted": true,
+  "properties": {
+    "contract_version": {
+      "type": "string",
+      "description": "Contract version identifier for the RiskScore schema instance.",
+      "x-trust-level": "derived-deterministic"
+    },
+    "scope_id": {
+      "type": "string",
+      "description": "Identifier for the asset or scope being scored.",
+      "x-trust-level": "derived-deterministic"
+    },
+    "score": {
+      "type": "number",
+      "description": "Deterministic risk score value.",
+      "x-trust-level": "derived-deterministic"
+    },
+    "band": {
+      "type": "string",
+      "description": "Risk band classification for the score.",
+      "enum": ["low", "medium", "high", "critical"],
+      "x-trust-level": "derived-deterministic"
+    },
+    "contributing_findings": {
+      "type": "array",
+      "description": "Finding identifiers that contribute to the score.",
+      "items": {
+        "type": "string",
+        "description": "Finding identifier.",
+        "x-trust-level": "reference-only"
+      },
+      "x-trust-level": "reference-only"
+    },
+    "scoring_policy_version": {
+      "type": "string",
+      "description": "Policy version used by the scoring logic.",
+      "x-trust-level": "trusted-policy"
+    },
+    "confidence_basis": {
+      "type": "string",
+      "description": "Basis description for deterministic confidence in the score.",
+      "x-trust-level": "derived-deterministic"
+    }
+  },
+  "required": [
+    "contract_version",
+    "scope_id",
+    "score",
+    "band",
+    "contributing_findings",
+    "scoring_policy_version",
+    "confidence_basis"
+  ]
+}

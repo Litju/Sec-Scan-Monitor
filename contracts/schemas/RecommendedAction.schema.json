@@ -1,0 +1,50 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://secscanmonitor.local/contracts/schemas/RecommendedAction.schema.json",
+  "title": "RecommendedAction",
+  "description": "Advisory next-step recommendation mapped to approved runbooks and workflow.",
+  "type": "object",
+  "additionalProperties": false,
+  "x-producer": "papa-or-echo-runtime-advisory-agent",
+  "x-persisted": false,
+  "properties": {
+    "contract_version": {
+      "type": "string",
+      "description": "Contract version identifier for the RecommendedAction schema instance.",
+      "x-trust-level": "advisory-transient"
+    },
+    "action_id": {
+      "type": "string",
+      "description": "Stable identifier for the recommended action.",
+      "x-trust-level": "advisory-transient"
+    },
+    "title": {
+      "type": "string",
+      "description": "Human-readable action title.",
+      "x-trust-level": "advisory-transient"
+    },
+    "rationale": {
+      "type": "string",
+      "description": "Rationale supporting the action.",
+      "x-trust-level": "advisory-transient"
+    },
+    "runbook_ref_id": {
+      "type": "string",
+      "description": "Runbook reference identifier associated with the action.",
+      "x-trust-level": "reference-only"
+    },
+    "blocking": {
+      "type": "boolean",
+      "description": "Whether the action is a blocking item.",
+      "x-trust-level": "advisory-transient"
+    }
+  },
+  "required": [
+    "contract_version",
+    "action_id",
+    "title",
+    "rationale",
+    "runbook_ref_id",
+    "blocking"
+  ]
+}

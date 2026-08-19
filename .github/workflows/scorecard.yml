@@ -1,0 +1,45 @@
+name: OpenSSF Scorecard
+
+on:
+  branch_protection_rule:
+  schedule:
+    - cron: "29 3 * * 1"
+  push:
+    branches: [main]
+
+permissions: read-all
+
+jobs:
+  scorecard:
+    name: Scorecard
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+      security-events: write
+    steps:
+      - name: Harden runner
+        uses: step-security/harden-runner@05e31511f85b41b11d1cf0ef85d0992719546e2c
+        with:
+          egress-policy: audit
+      - name: Checkout
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - name: Run Scorecard
+        uses: ossf/scorecard-action@2d1146689b8cda280b9bc96326124645441f03bc
+        with:
+          results_file: scorecard-results.sarif
+          results_format: sarif
+          publish_results: true
+      - name: Upload SARIF
+        uses: github/codeql-action/upload-sarif@d6317709a54fd87078d323eeb0e48ec331c8e621
+        with:
+          sarif_file: scorecard-results.sarif
+      - name: Upload Scorecard artifact
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: scorecard-results
+          path: scorecard-results.sarif
+          if-no-files-found: error

@@ -1,0 +1,273 @@
+"use client";
+
+import { useRouter } from "next/navigation";
+import { useMemo, useState, type ReactNode } from "react";
+import { flexRender, getCoreRowModel, useReactTable, type ColumnDef } from "@tanstack/react-table";
+import { useQueryClient } from "@tanstack/react-query";
+import { parseAsString, useQueryState } from "nuqs";
+import { ArrowUpRight, CheckCircle2, ChevronRight, CircleDot, FileCheck2, FlaskConical, LockKeyhole, MessageCircleQuestion, Play, ShieldCheck, SlidersHorizontal, Wrench } from "lucide-react";
+import { CommandCenter } from "@/components/firm/CommandCenter";
+import { buildAttentionItems } from "@/lib/domain/attention";
+import { expertRoutes, normalizeSurface, type SurfaceKey } from "@/lib/domain/navigation";
+import type { ApprovalView, AgentRunView, AuditEventView, DataMode, EngagementView, FindingView, PreviewData, ReportView } from "@/lib/domain/types";
+import { createApiClient } from "@/lib/api/client";
+
+type DisplayMode = DataMode | "CONFIG_ERROR";
+
+type Props = {
+  surface: SurfaceKey;
+  selectedId?: string;
+  data: PreviewData | null;
+  mode: DisplayMode;
+  onNavigate: (surface: SurfaceKey, id?: string) => void;
+  onOpenAssistant: () => void;
+  onMutationAttempt: (message: string) => void;
+};
+
+export function display(value: string): string {
+  return value.replaceAll("_", " ").replaceAll("-", " ");
+}
+
+function tone(value: string): "success" | "warning" | "danger" | "info" | "violet" | "" {
+  const lower = value.toLowerCase();
+  if (["qualified", "available", "closed", "completed", "supported", "grounded", "allow", "sanitized", "asserted"].some((item) => lower.includes(item))) return "success";
+  if (["inconclusive", "pending", "running", "attention", "medium", "not_validated", "deferred", "required"].some((item) => lower.includes(item))) return "warning";
+  if (["critical", "high", "failed", "denied", "refused", "missing", "unsanitized"].some((item) => lower.includes(item))) return "danger";
+  if (["low", "inspect", "reporting", "analysis", "not required"].some((item) => lower.includes(item))) return "info";
+  if (["agent", "claim"].some((item) => lower.includes(item))) return "violet";
+  return "";
+}
+
+export function Status({ value }: { value: string }) {
+  return <span className={`status ${tone(value)}`}>{display(value)}</span>;
+}
+
+export function SurfaceHeader({ eyebrow, title, description, action }: { eyebrow: string; title: string; description: string; action?: ReactNode }) {
+  return <div className="page-intro"><div className="page-intro-copy"><p className="eyebrow">{eyebrow}</p><h1 className="page-title">{title}</h1><p className="page-description">{description}</p></div>{action ? <div className="page-actions">{action}</div> : null}</div>;
+}
+
+function IntegratedEmpty({ mode }: { mode: DisplayMode }) {
+  return <div className="surface-panel panel-pad"><div className="empty-state"><SlidersHorizontal size={22} aria-hidden="true" /><strong>{mode === "CONFIG_ERROR" ? "Frontend mode configuration needs attention" : "Read model unavailable for this surface"}</strong><span>{mode === "CONFIG_ERROR" ? "Set NEXT_PUBLIC_SECSCAN_MODE to PREVIEW, LOCAL_INTEGRATED, or HOSTED_INTEGRATED." : "The browser is not using preview data. Add the minimal server-side read model before qualifying this screen against live state."}</span><span className="mono">state: not_validated · mode: {mode}</span></div></div>;
+}
+
+function CaseTable({ cases, onNavigate }: { cases: EngagementView[]; onNavigate: Props["onNavigate"] }) {
+  const columns = useMemo<ColumnDef<EngagementView>[]>(() => [
+    { accessorKey: "engagementId", header: "Case", cell: (info) => <div className="primary-cell"><strong className="mono">{info.getValue<string>()}</strong><span className="cell-note">{info.row.original.passType}</span></div> },
+    { accessorKey: "clientName", header: "Client / target", cell: (info) => <div className="primary-cell"><strong>{info.getValue<string>()}</strong><span className="cell-note">{info.row.original.targetLabel} · {info.row.original.snapshotLabel}</span></div> },
+    { accessorKey: "status", header: "State", cell: (info) => <Status value={info.getValue<string>()} /> },
+    { accessorKey: "findingCount", header: "Findings", cell: (info) => <span className="mono">{info.getValue<number>()}</span> },
+  ], []);
+  // TanStack Table owns an intentionally imperative table instance; React Compiler must not memoize it.
+  // eslint-disable-next-line react-hooks/incompatible-library
+  const table = useReactTable({ data: cases, columns, getCoreRowModel: getCoreRowModel() });
+  return <div className="table-wrap"><table className="data-table cases-table"><thead>{table.getHeaderGroups().map((group) => <tr key={group.id}>{group.headers.map((header) => <th key={header.id}>{header.isPlaceholder ? null : flexRender(header.column.columnDef.header, header.getContext())}</th>)}</tr>)}</thead><tbody>{table.getRowModel().rows.map((row) => <tr key={row.id} tabIndex={0} onClick={() => onNavigate("cases", row.original.engagementId)} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); onNavigate("cases", row.original.engagementId); } }}>{row.getVisibleCells().map((cell) => <td key={cell.id}>{flexRender(cell.column.columnDef.cell, cell.getContext())}</td>)}</tr>)}</tbody></table></div>;
+}
+
+function HostedCaseCreator({ data, mode }: { data: PreviewData; mode: DisplayMode }) {
+  const router = useRouter();
+  const queryClient = useQueryClient();
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState("");
+  if (mode !== "HOSTED_INTEGRATED") return null;
+  const client = data.clients[0];
+  const target = data.targets.find((item) => item.clientId === client?.clientId) ?? data.targets[0];
+  async function createCase() {
+    if (!client || !target || !target.snapshot) {
+      setError("A tenant target with an immutable snapshot is required.");
+      return;
+    }
+    setSubmitting(true);
+    setError("");
+    const engagementId = `CASE-R6-${Date.now()}`;
+    try {
+      const api = createApiClient("HOSTED_INTEGRATED");
+      await api.createEngagement({
+        engagement_id: engagementId,
+        client_id: client.clientId,
+        target_ids: [target.targetId],
+        scope: "Synthetic staging inspection",
+        pass_type: "posture",
+        constraints: ["synthetic-only", "inspection-only", "no-production-active-testing"],
+      });
+      await api.authorize(engagementId);
+      await queryClient.invalidateQueries({ queryKey: ["secscan-hosted-data"] });
+      router.push(`/cases/${encodeURIComponent(engagementId)}`);
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Case creation failed closed.");
+      setSubmitting(false);
+    }
+  }
+  return <section className="surface-panel panel-pad" aria-labelledby="create-case-title"><div className="table-toolbar"><div><p className="eyebrow">Hosted staging</p><h2 className="panel-title" id="create-case-title">Create synthetic Case</h2><p className="panel-description">Uses the authenticated tenant’s first immutable target. No preview data is used.</p></div><button className="button primary" type="button" onClick={() => void createCase()} disabled={submitting || !client || !target?.snapshot}>{submitting ? "Creating…" : "Create Case"}</button></div>{error ? <p className="status danger" role="alert">{error}</p> : null}</section>;
+}
+
+function CasesIndex({ data, mode, onNavigate }: { data: PreviewData; mode: DisplayMode; onNavigate: Props["onNavigate"] }) {
+  const [state, setState] = useQueryState("state", parseAsString.withDefault("attention"));
+  const attentionIds = useMemo(() => new Set(buildAttentionItems(data).map((item) => item.entityId)), [data]);
+  const isActive = (item: EngagementView) => !["closed", "refused", "revoked"].includes(item.status);
+  const needsAttention = (item: EngagementView) => isActive(item) && (attentionIds.has(item.engagementId) || item.findingCount > 0);
+  const view = (["attention", "running", "completed"] as const).includes(state as "attention" | "running" | "completed") ? state : "attention";
+  const cases = data.engagements.filter((item) => view === "completed" ? ["closed", "refused", "revoked"].includes(item.status) : view === "running" ? ["active", "evidence_collection", "analysis", "adjudication"].includes(item.status) : needsAttention(item));
+  const counts = { attention: data.engagements.filter(needsAttention).length, running: data.engagements.filter((item) => ["active", "evidence_collection", "analysis", "adjudication"].includes(item.status)).length, completed: data.engagements.filter((item) => ["closed", "refused", "revoked"].includes(item.status)).length };
+  return <div className="stack"><SurfaceHeader eyebrow="Workspace · contract-governed work" title="Cases" description="A case is the plain-language view of an engagement. The contract, target, authority, and evidence remain bound underneath." action={<button className="button primary" type="button" onClick={() => onNavigate("cases", cases[0]?.engagementId)}>Open first case <ArrowUpRight size={15} aria-hidden="true" /></button>} /><HostedCaseCreator data={data} mode={mode} /><div className="case-state-tabs" role="tablist" aria-label="Case state"><button className={view === "attention" ? "selected" : ""} type="button" role="tab" aria-selected={view === "attention"} onClick={() => setState("attention")}>Needs attention <span>{counts.attention}</span></button><button className={view === "running" ? "selected" : ""} type="button" role="tab" aria-selected={view === "running"} onClick={() => setState("running")}>Running <span>{counts.running}</span></button><button className={view === "completed" ? "selected" : ""} type="button" role="tab" aria-selected={view === "completed"} onClick={() => setState("completed")}>Completed <span>{counts.completed}</span></button></div><section className="surface-panel panel-pad" aria-labelledby="cases-table-title"><div className="table-toolbar"><div><p className="eyebrow">Saved view · {view}</p><h2 className="panel-title" id="cases-table-title">{cases.length} case{cases.length === 1 ? "" : "s"}</h2><p className="panel-description">Select a row to keep the case context intact.</p></div><span className="status info">inspection-only</span></div>{cases.length ? <CaseTable cases={cases} onNavigate={onNavigate} /> : <div className="empty-state"><CheckCircle2 size={22} aria-hidden="true" /><strong>No cases in this state</strong><span>The preview makes the empty state explicit; no fallback data is fabricated.</span></div>}</section></div>;
+}
+
+type CaseTab = "overview" | "findings" | "activity" | "report";
+
+function HostedInspectionStarter({ data, engagement, mode }: { data: PreviewData; engagement: EngagementView; mode: DisplayMode }) {
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState("");
+  if (mode !== "HOSTED_INTEGRATED") return null;
+  const target = data.targets.find((item) => item.targetId === engagement.targetIds[0]);
+  const canStart = Boolean(target?.snapshot && target.snapshot !== "not_validated");
+  async function startInspection() {
+    if (!target?.snapshot) return;
+    setSubmitting(true);
+    setError("");
+    try {
+      await createApiClient("HOSTED_INTEGRATED").startInspection(engagement.engagementId, target.targetId, target.snapshot);
+      window.location.reload();
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Inspection was refused.");
+      setSubmitting(false);
+    }
+  }
+  return <section className="surface-panel panel-pad" aria-labelledby="start-inspection-title"><div className="table-toolbar"><div><p className="eyebrow">Hosted workflow</p><h2 className="panel-title" id="start-inspection-title">Run inspection</h2><p className="panel-description">The backend binds this Case to its immutable snapshot, policy, sandbox, evidence, adjudication, and report.</p></div><button className="button primary" type="button" onClick={() => void startInspection()} disabled={submitting || !canStart || !["authorized", "active"].includes(engagement.status)}>{submitting ? "Starting…" : "Start inspection"}</button></div>{error ? <p className="status danger" role="alert">{error}</p> : null}</section>;
+}
+
+function CaseCenter({ data, id, mode, onNavigate }: { data: PreviewData; id?: string; mode: DisplayMode; onNavigate: Props["onNavigate"] }) {
+  const [tabValue, setTabValue] = useQueryState("tab", parseAsString.withDefault("overview"));
+  const [tab, setTab] = useState<CaseTab>((["overview", "findings", "activity", "report"] as string[]).includes(tabValue) ? tabValue as CaseTab : "overview");
+  const engagement = data.engagements.find((item) => item.engagementId === id) ?? data.engagements[0];
+  if (!engagement) return <IntegratedEmpty mode="PREVIEW" />;
+  const findings = data.findings.filter((finding) => finding.engagementId === engagement.engagementId);
+  const report = data.reports.find((item) => item.engagementId === engagement.engagementId) ?? data.reports[0];
+  function changeTab(next: CaseTab) { setTab(next); void setTabValue(next); }
+  return <div className="stack"><SurfaceHeader eyebrow="Case · plain-language context" title={`Case ${engagement.engagementId}`} description={`${engagement.clientName} · ${engagement.scope}`} action={<><Status value={engagement.authorityLevel} /><Status value={engagement.status} /></>} /><HostedInspectionStarter data={data} engagement={engagement} mode={mode} /><nav className="case-tabs" aria-label="Case sections">{(["overview", "findings", "activity", "report"] as const).map((item) => <button className={tab === item ? "active" : ""} key={item} type="button" aria-current={tab === item ? "page" : undefined} onClick={() => changeTab(item)}>{item[0].toUpperCase() + item.slice(1)}</button>)}</nav>{tab === "overview" ? <CaseOverview engagement={engagement} findings={findings} data={data} onNavigate={onNavigate} /> : tab === "findings" ? <CaseFindings findings={findings} onNavigate={onNavigate} /> : tab === "activity" ? <ActivityTab data={data} engagement={engagement} onNavigate={onNavigate} /> : <ReportArticle report={report} data={data} onNavigate={onNavigate} />}</div>;
+}
+
+function CaseOverview({ engagement, findings, data, onNavigate }: { engagement: EngagementView; findings: FindingView[]; data: PreviewData; onNavigate: Props["onNavigate"] }) {
+  return <div className="case-overview"><div className="case-overview-main"><section className="surface-panel panel-pad" aria-labelledby="what-found-title"><p className="eyebrow">What we found</p><h2 className="panel-title" id="what-found-title">{findings.length ? findings[0].summary : "No adjudicated finding in this case"}</h2><p className="panel-description">{findings.length ? findings[0].impact : "Signals remain signals until the adjudication service concludes."}</p>{findings.length ? <div className="case-action-row"><button className="button primary" type="button" onClick={() => onNavigate("findings", findings[0].findingId)}>Review finding <ArrowUpRight size={15} aria-hidden="true" /></button><button className="button" type="button" onClick={() => onNavigate("reports", engagement.engagementId)}>View report</button></div> : null}</section><section className="surface-panel panel-pad" aria-labelledby="what-next-title"><p className="eyebrow">What next</p><h2 className="panel-title" id="what-next-title">Keep the conclusion bounded</h2><p className="panel-description">The next action remains governed by the case contract and canonical service.</p><div className="case-facts"><span><strong>{data.evidence.filter((item) => item.engagementId === engagement.engagementId).length}</strong> evidence records</span><span><strong>{data.runs.filter((item) => item.engagementId === engagement.engagementId).length}</strong> activity records</span><span><strong>{engagement.findingCount}</strong> adjudicated findings</span></div></section></div><aside className="surface-panel panel-pad case-context" aria-labelledby="case-context-title"><div className="panel-header"><div><p className="eyebrow">Context</p><h2 className="panel-title" id="case-context-title">Bound record</h2></div><LockKeyhole size={18} aria-hidden="true" /></div><dl className="lens-list"><div className="lens-row"><dt>Case</dt><dd className="mono">{engagement.engagementId}</dd></div><div className="lens-row"><dt>Target</dt><dd>{engagement.targetLabel}<br /><span className="mono">{engagement.snapshotLabel}</span></dd></div><div className="lens-row"><dt>Pass</dt><dd>{engagement.passType}</dd></div><div className="lens-row"><dt>Authority</dt><dd><Status value={engagement.authorityLevel} /></dd></div></dl><div className="lens-callout"><strong>Inspection-only</strong><p className="small muted">The UI explains state. It does not approve, mutate, or promote a claim.</p></div></aside></div>;
+}
+
+function CaseFindings({ findings, onNavigate }: { findings: FindingView[]; onNavigate: Props["onNavigate"] }) {
+  return <section className="surface-panel panel-pad" aria-labelledby="case-findings-title"><div className="panel-header"><div><p className="eyebrow">Adjudicated conclusions</p><h2 className="panel-title" id="case-findings-title">Findings</h2><p className="panel-description">Scanner output remains upstream and is not styled as a finding.</p></div><Status value="adjudication-bound" /></div>{findings.length ? <div className="stack">{findings.map((finding) => <button className="evidence-row task-row-plain" type="button" key={finding.findingId} onClick={() => onNavigate("findings", finding.findingId)}><div className="primary-cell"><strong>{finding.summary}</strong><span className="cell-note mono">{finding.findingId} · {finding.adjudication}</span></div><div className="chip-row"><Status value={finding.severity} /></div><ChevronRight size={16} aria-hidden="true" /></button>)}</div> : <div className="empty-state"><strong>No adjudicated finding</strong><span>Signals remain signals until the canonical adjudication service concludes.</span></div>}</section>;
+}
+
+type ActivityRecord = { id: string; title: string; detail: string; status: string; kind: "run" | "audit"; run?: AgentRunView; audit?: AuditEventView };
+
+function ActivityTab({ data, engagement, onNavigate }: { data: PreviewData; engagement: EngagementView; onNavigate: Props["onNavigate"] }) {
+  const [selectedId, setSelectedId] = useState<string>();
+  const records = useMemo<ActivityRecord[]>(() => [...data.runs.filter((run) => run.engagementId === engagement.engagementId).map((run) => ({ id: run.agentRunId, title: run.agentRole, detail: `${run.agentRunId} · ${run.agentVersion}`, status: run.status, kind: "run" as const, run })), ...data.audit.filter((event) => event.engagementId === engagement.engagementId).map((event) => ({ id: event.auditEventId, title: event.summary, detail: `${event.auditEventId} · ${event.occurredAt}`, status: event.kind, kind: "audit" as const, audit: event }))], [data, engagement.engagementId]);
+  const selected = records.find((item) => item.id === selectedId) ?? records[0];
+  return <div className="case-tab-layout"><section className="surface-panel panel-pad" aria-labelledby="activity-title"><div className="panel-header"><div><p className="eyebrow">Activity · exact in advanced view</p><h2 className="panel-title" id="activity-title">What is happening</h2><p className="panel-description">Task rows keep bounded work readable; select one for the technical context lens.</p></div><Status value="read-only" /></div><div className="activity-list">{records.length ? records.map((record) => <button className={`activity-row ${selected?.id === record.id ? "selected" : ""}`} type="button" key={record.id} onClick={() => setSelectedId(record.id)}><span className={`activity-state ${tone(record.status)}`} aria-hidden="true">{record.kind === "run" ? <Play size={13} /> : <CircleDot size={13} />}</span><span className="activity-main"><strong>{record.title}</strong><small>{record.detail}</small><span className="chip-row">{record.kind === "run" ? record.run?.capabilityIds.map((capability) => <span className="tool-chip" key={capability} onClick={(event) => { event.stopPropagation(); onNavigate("capabilities"); }}><Wrench size={12} aria-hidden="true" />{capability}</span>) : <span className="tool-chip"><FileCheck2 size={12} aria-hidden="true" />{record.status}</span>}</span></span><Status value={record.status} /><ChevronRight size={15} aria-hidden="true" /></button>) : <div className="empty-state"><strong>No activity is available</strong><span>Integrated mode must expose the qualified activity read model before this surface can be validated.</span></div>}</div></section><ActivityContextLens record={selected} data={data} /></div>;
+}
+
+function ActivityContextLens({ record, data }: { record?: ActivityRecord; data: PreviewData }) {
+  const run = record?.run;
+  const capability = run ? data.capabilities.find((item) => run.capabilityIds.includes(item.capabilityId)) : undefined;
+  const evidence = run ? data.evidence.filter((item) => run.evidenceIds.includes(item.evidenceId)) : [];
+  return <aside className="surface-panel panel-pad lens context-lens" aria-live="polite"><div className="panel-header"><div><p className="eyebrow">Context lens</p><h2 className="panel-title">{record?.title ?? "Select activity"}</h2><p className="panel-description">Technical detail stays one click away.</p></div><ShieldCheck size={18} aria-hidden="true" /></div>{record ? <dl className="lens-list">{run ? <><div className="lens-row"><dt>Agent</dt><dd className="mono">{run.agentId} · {run.agentRole}</dd></div><div className="lens-row"><dt>AgentRun</dt><dd className="mono">{run.agentRunId}</dd></div><div className="lens-row"><dt>Tool</dt><dd className="mono">{capability?.toolIdentity ?? "not validated"}</dd></div><div className="lens-row"><dt>Capability</dt><dd className="mono">{run.capabilityIds.join(" · ") || "none"}</dd></div><div className="lens-row"><dt>Permission decision</dt><dd className="mono">{run.authorityRefs.join(" · ") || "not validated"}</dd></div><div className="lens-row"><dt>Sandbox</dt><dd>{capability ? `${capability.sandboxProfile} · ${capability.networkPolicy}` : "not validated"}</dd></div><div className="lens-row"><dt>Evidence</dt><dd className="mono">{run.evidenceIds.join(" · ") || "none"}</dd></div><div className="lens-row"><dt>Hash</dt><dd className="mono">{evidence.map((item) => item.sha256).join(" · ") || "not validated"}</dd></div><div className="lens-row"><dt>Duration</dt><dd>{run.finishedAt ? `${run.startedAt} → ${run.finishedAt}` : "not validated · still running"}</dd></div><div className="lens-row"><dt>Provenance</dt><dd>{run.origin}</dd></div></> : <><div className="lens-row"><dt>Event</dt><dd className="mono">{record.audit?.auditEventId}</dd></div><div className="lens-row"><dt>Principal</dt><dd className="mono">{record.audit?.principalId ?? "system"}</dd></div><div className="lens-row"><dt>Related</dt><dd className="mono">{record.audit?.relatedIds.join(" · ")}</dd></div></>}</dl> : <div className="empty-state"><strong>Choose a task row</strong><span>Agent, run, tool, permission, sandbox, evidence, and provenance are contextual details.</span></div>}</aside>;
+}
+
+function FindingsIndex({ data, onNavigate }: { data: PreviewData; onNavigate: Props["onNavigate"] }) {
+  return <div className="stack"><SurfaceHeader eyebrow="Expert view · adjudication" title="Findings" description="A finding is an adjudicated conclusion. Scanner output, observations, and claims remain visibly upstream." action={<button className="button" type="button" onClick={() => onNavigate("evidence")}>Open evidence</button>} /><p className="context-note"><strong>Separation law.</strong> Signal → observation → claim → review decision → finding. Security severity remains tied to the adjudication record.</p><section className="surface-panel panel-pad"><div className="table-wrap"><table className="data-table"><thead><tr><th>Finding</th><th>Severity</th><th>Review decision</th><th>Confidence</th><th>State</th></tr></thead><tbody>{data.findings.map((finding) => <tr key={finding.findingId} tabIndex={0} onClick={() => onNavigate("findings", finding.findingId)} onKeyDown={(event) => { if (event.key === "Enter") onNavigate("findings", finding.findingId); }}><td><div className="primary-cell"><strong>{finding.summary}</strong><span className="cell-note mono">{finding.findingId} · {finding.engagementId}</span></div></td><td><Status value={finding.severity} /></td><td><Status value={finding.adjudication} /></td><td><Status value={finding.confidence} /></td><td></td><td><Status value={finding.status} /></td></tr>)}</tbody></table></div></section></div>;
+}
+
+function FindingDetail({ data, id, onNavigate }: { data: PreviewData; id?: string; onNavigate: Props["onNavigate"] }) {
+  const finding = data.findings.find((item) => item.findingId === id) ?? data.findings[0];
+  if (!finding) return <IntegratedEmpty mode="PREVIEW" />;
+  const evidence = data.evidence.filter((item) => finding.supportingEvidenceIds.concat(finding.contradictingEvidenceIds).includes(item.evidenceId));
+  return <div className="stack"><SurfaceHeader eyebrow="Finding · answer first" title={finding.findingId} description={`Case ${finding.engagementId} · adjudicated conclusion`} /><section className="finding-hero"><div className="chip-row"><Status value={finding.severity} /><Status value={finding.adjudication} /><Status value={finding.status} /></div><p className="finding-answer">{finding.summary}</p><p className="muted" style={{ margin: 0 }}>{finding.impact}</p><div className="finding-axes"><div className="axis"><div className="axis-label">Severity</div><div className="axis-value">{finding.severity}</div><div className="axis-note">Fixed firm severity scale and canonical adjudication.</div></div><div className="axis"><div className="axis-label">Confidence</div><div className="axis-value">{finding.confidence}</div><div className="axis-note">Confidence remains categorical and evidence-linked.</div></div></div></section><div className="detail-grid"><div className="stack"><section className="surface-panel panel-pad"><p className="eyebrow">Layer 2 · inspectable support</p><h2 className="panel-title">Evidence and contradictions</h2><p className="panel-description">Metadata only; raw evidence retrieval remains behind backend authority.</p><div className="evidence-list">{evidence.map((item) => <button className="evidence-row" key={item.evidenceId} type="button" onClick={() => onNavigate("evidence", item.evidenceId)}><div className="primary-cell"><strong className="mono">{item.evidenceId}</strong><span className="cell-note">{item.collector} · {item.contentType} · {item.byteSize} bytes</span><span className="cell-note mono">sha256 {item.sha256} · {item.sanitizationState}</span></div><Status value="metadata" /></button>)}</div></section><section className="surface-panel panel-pad"><p className="eyebrow">Verification</p><h2 className="panel-title">What would resolve this?</h2><p className="panel-description">{finding.verificationStep}</p><p className="small muted">{finding.remediationGuidance}</p></section></div><aside className="surface-panel panel-pad lens"><p className="eyebrow">Layer 3 · exact record</p><h2 className="panel-title">Why this state?</h2><details className="disclosure" open><summary>Open provenance details</summary><dl className="lens-list"><div className="lens-row"><dt>Supporting</dt><dd className="mono">{finding.supportingEvidenceIds.join(" · ") || "none"}</dd></div><div className="lens-row"><dt>Contradicting</dt><dd className="mono">{finding.contradictingEvidenceIds.join(" · ") || "none"}</dd></div><div className="lens-row"><dt>Confidence</dt><dd><Status value={finding.confidence} /></dd></div></dl></details><div className="lens-callout"><strong>Evidence refs</strong><div className="grounding-refs">{finding.supportingEvidenceIds.map((evidenceId) => <span className="grounding-ref" key={evidenceId}>{evidenceId}</span>)}</div></div></aside></div></div>;
+}
+
+function EvidenceVault({ data, id, onNavigate }: { data: PreviewData; id?: string; onNavigate: Props["onNavigate"] }) {
+  const selected = id ? data.evidence.find((item) => item.evidenceId === id) : undefined;
+  return <div className="stack"><SurfaceHeader eyebrow="Expert view · evidence" title="Evidence" description="Metadata-first custody. The browser never receives raw evidence or unsafe retrieval URLs." action={<button className="button" type="button" onClick={() => onNavigate("audit")}>Audit custody</button>} /><section className="surface-panel panel-pad"><div className="table-toolbar"><div><h2 className="panel-title">Evidence objects</h2><p className="panel-description">Hash, source, scope, and sanitization are the working surface.</p></div><Status value="raw bytes withheld" /></div><div className="table-wrap"><table className="data-table"><thead><tr><th>Evidence ID</th><th>Source</th><th>Case / snapshot</th><th>Hash</th><th>Sanitization</th><th>Used by</th></tr></thead><tbody>{data.evidence.map((item) => <tr key={item.evidenceId} tabIndex={0} className={selected?.evidenceId === item.evidenceId ? "selected" : ""} onClick={() => onNavigate("evidence", item.evidenceId)} onKeyDown={(event) => { if (event.key === "Enter") onNavigate("evidence", item.evidenceId); }}><td><span className="mono">{item.evidenceId}</span><div className="cell-note">{item.contentType} · {item.byteSize} bytes</div></td><td><div className="primary-cell"><strong>{item.collector}</strong><span className="cell-note">{item.toolVersion}</span></div></td><td><div className="primary-cell"><strong className="mono">{item.engagementId}</strong><span className="cell-note">{item.targetSnapshot}</span></div></td><td className="mono">{item.sha256}</td><td><Status value={item.sanitizationState} /></td><td className="mono">{item.usedBy.join(" · ")}</td></tr>)}</tbody></table></div></section>{selected ? <section className="surface-panel panel-pad lens" aria-label="Evidence metadata detail"><div className="panel-header"><div><p className="eyebrow">Context lens</p><h2 className="panel-title">{selected.evidenceId}</h2><p className="panel-description">Metadata detail only; storage reference is intentionally non-fetchable in the browser.</p></div><Status value={selected.sanitizationState} /></div><dl className="lens-list"><div className="lens-row"><dt>Tool</dt><dd className="mono">{selected.capabilityId}</dd></div><div className="lens-row"><dt>Invocation</dt><dd className="mono">{selected.invocationId}</dd></div><div className="lens-row"><dt>Storage ref</dt><dd className="mono">{selected.storageRef}</dd></div><div className="lens-row"><dt>Collected</dt><dd className="mono">{selected.collectedAt}</dd></div></dl></section> : null}</div>;
+}
+
+function AgentRuns({ data }: { data: PreviewData }) {
+  return <div className="stack"><SurfaceHeader eyebrow="Expert view · activity" title="Activity" description="Agent manifests and runs are evidence-linked records. An agent is not an authority source." /><section className="surface-panel panel-pad"><div className="table-wrap"><table className="data-table"><thead><tr><th>Activity</th><th>Agent / model</th><th>Status</th><th>Permission refs</th><th>Tools</th><th>Evidence</th></tr></thead><tbody>{data.runs.map((run) => <tr key={run.agentRunId}><td><div className="primary-cell"><strong className="mono">{run.agentRunId}</strong><span className="cell-note">{run.engagementId}</span></div></td><td><div className="primary-cell"><strong>{run.agentRole}</strong><span className="cell-note">{run.agentVersion} · {run.modelIdentity}</span></div></td><td><Status value={run.status} /></td><td className="mono">{run.authorityRefs.join(" · ")}</td><td className="mono">{run.capabilityIds.join(" · ")}</td><td className="mono">{run.evidenceIds.length}</td></tr>)}</tbody></table></div></section><div className="split-grid"><section className="surface-panel panel-pad"><p className="eyebrow">Contract guardrail</p><h2 className="panel-title">Agent ≠ authority</h2><p className="panel-description">Direct finding creation is refused; every run points to bounded authority and evidence.</p><Status value="refused" /></section><section className="surface-panel panel-pad"><p className="eyebrow">Exact in context lens</p><h2 className="panel-title">Tool and provenance</h2><p className="panel-description">Open Activity from a case to see the selected run’s agent, tool, permission, sandbox, evidence, hash, and provenance.</p></section></div></div>;
+}
+
+function CapabilityExecution({ data }: { data: PreviewData }) {
+  const capability = data.capabilities[0];
+  if (!capability) return <IntegratedEmpty mode="PREVIEW" />;
+  return <div className="stack"><SurfaceHeader eyebrow="Expert view · tools" title="Tools" description="The operator can follow registry resolution to evidence without confusing a tool with the firm’s authority." /><div className="split-grid"><section className="surface-panel panel-pad"><p className="eyebrow">Execution trust</p><h2 className="panel-title">{capability.capabilityId}</h2><p className="panel-description">{capability.description}</p><div className="trace">{[["Registry", "Capability ID and version resolved from the registered foundation set."], ["Permission", "Canonical policy decision remains outside the browser."], ["Sandbox", `${capability.sandboxProfile} · ${capability.networkPolicy}`], ["Evidence", `${capability.evidenceType} · metadata custody fields`]].map(([title, detail], index) => <div className="trace-step" key={title}><span className="trace-icon">{index + 1}</span><div className="trace-card"><strong>{title}</strong><p>{detail}</p></div></div>)}</div></section><aside className="surface-panel panel-pad lens"><p className="eyebrow">Tool manifest</p><h2 className="panel-title">{capability.toolIdentity}</h2><dl className="lens-list"><div className="lens-row"><dt>Version</dt><dd className="mono">{capability.toolVersion}</dd></div><div className="lens-row"><dt>Authority</dt><dd><Status value={capability.requiredAuthority} /></dd></div><div className="lens-row"><dt>Approval</dt><dd><Status value={capability.requiresApproval ? "required" : "not required"} /></dd></div><div className="lens-row"><dt>Limits</dt><dd className="mono">{Object.entries(capability.resourceLimits).map(([key, value]) => `${key} ${value}`).join(" · ")}</dd></div></dl></aside></div><section className="surface-panel panel-pad"><div className="table-wrap"><table className="data-table"><thead><tr><th>Tool</th><th>Risk</th><th>Authority</th><th>Approval</th><th>Network</th><th>Timeout</th></tr></thead><tbody>{data.capabilities.map((item) => <tr key={item.capabilityId}><td><div className="primary-cell"><strong className="mono">{item.capabilityId}</strong><span className="cell-note">{item.description}</span></div></td><td><Status value={item.riskClass} /></td><td><Status value={item.requiredAuthority} /></td><td><Status value={item.requiresApproval ? "required" : "not required"} /></td><td className="mono">{item.networkPolicy}</td><td className="mono">{item.timeoutSeconds}s</td></tr>)}</tbody></table></div></section></div>;
+}
+
+function Approvals({ data, mode, onMutationAttempt }: { data: PreviewData; mode: DisplayMode; onMutationAttempt: Props["onMutationAttempt"] }) {
+  const pending = data.approvals.filter((approval) => approval.decision === "pending");
+  function attempt(approval: ApprovalView) { if (mode === "PREVIEW") onMutationAttempt(`Preview mode keeps ${approval.approvalId} disabled; no action was sent.`); }
+  return <div className="stack"><SurfaceHeader eyebrow="Expert view · exact binding" title="Approvals" description="An approval decides one exact request. It cannot authorize a different target, tool, action, or case." /><p className="context-note"><strong>Preview · no mutations.</strong> Integrated mode must call the canonical approval endpoint and record the decision in audit.</p>{pending.length ? pending.map((approval) => <section className="surface-panel panel-pad" key={approval.approvalId}><div className="panel-header"><div><p className="eyebrow">Configuration change requested</p><h2 className="panel-title mono">{approval.approvalId}</h2><p className="panel-description">{approval.rationale}</p></div><Status value={approval.risk} /></div><dl className="lens-list"><div className="lens-row"><dt>Case / engagement</dt><dd className="mono">{approval.engagementId}</dd></div><div className="lens-row"><dt>Target</dt><dd className="mono">{approval.targetId}</dd></div><div className="lens-row"><dt>Tool / capability</dt><dd className="mono">{approval.capabilityId}</dd></div><div className="lens-row"><dt>Action</dt><dd>{approval.action}</dd></div><div className="lens-row"><dt>Request identity</dt><dd className="mono">{approval.requestedBy} · {approval.requestRef}</dd></div><div className="lens-row"><dt>Authority effect</dt><dd>Exact request only; no broader grant.</dd></div><div className="lens-row"><dt>Fingerprint</dt><dd className="mono">{approval.requestFingerprint}</dd></div></dl><div className="divider" /><div className="page-actions" style={{ justifyContent: "flex-start" }}><button className="button primary" type="button" disabled={mode === "PREVIEW"} onClick={() => attempt(approval)}>Approve this action</button><button className="button danger" type="button" disabled={mode === "PREVIEW"} onClick={() => attempt(approval)}>Deny this action</button></div></section>) : <div className="empty-state"><strong>No pending approvals</strong><span>Every executed action remains attributable to a canonical policy decision.</span></div>}</div>;
+}
+
+function ReportArticle({ report, data, onNavigate }: { report?: ReportView; data: PreviewData; onNavigate: Props["onNavigate"] }) {
+  if (!report) return <IntegratedEmpty mode="PREVIEW" />;
+  const findings = data.findings.filter((finding) => report.findingIds.includes(finding.findingId));
+  return <article className="report-article surface-panel panel-pad"><p className="eyebrow">{report.engagementId} · {report.verdict}</p><h2 className="page-title" style={{ fontSize: 30 }}>{report.title}</h2><p className="page-description">{report.scope}</p><div className="report-sections"><section><h3>Summary</h3><p>{report.scope}</p></section><section><h3>Findings</h3>{findings.length ? findings.map((finding) => <button className="report-link" key={finding.findingId} type="button" onClick={() => onNavigate("findings", finding.findingId)}>{finding.findingId} · {finding.summary}</button>) : <p className="muted">No findings are attached to this report.</p>}</section><section><h3>Limitations</h3><p>{report.limitationCount} recorded; unsupported production claims are not made.</p></section><section><h3>Recommendations</h3><p>Preserve the case boundary and follow the verification step attached to each finding.</p></section><section><h3>Evidence References</h3><p className="mono">{report.evidenceIds.join(" · ") || "none"}</p></section><section><h3>Provenance</h3><p className="mono">Generated {report.generatedAt} · hash {report.reportSha256} · no-secrets {report.noSecretsAssertion}</p></section></div></article>;
+}
+
+function Reports({ data, onNavigate }: { data: PreviewData; onNavigate: Props["onNavigate"] }) {
+  const columns = useMemo<ColumnDef<ReportView>[]>(() => [
+    { accessorKey: "title", header: "Report", cell: (info) => <div className="primary-cell"><strong>{info.getValue<string>()}</strong><span className="cell-note mono">{info.row.original.engagementId}</span></div> },
+    { accessorKey: "verdict", header: "Outcome", cell: (info) => <Status value={info.getValue<string>()} /> },
+    { accessorKey: "generatedAt", header: "Date", cell: (info) => <span className="mono">{info.getValue<string>().slice(0, 10)}</span> },
+    { accessorKey: "limitationCount", header: "Limitations", cell: (info) => <span className="mono">{info.getValue<number>()}</span> },
+  ], []);
+  // TanStack Table owns an intentionally imperative table instance; React Compiler must not memoize it.
+  // eslint-disable-next-line react-hooks/incompatible-library
+  const table = useReactTable({ data: data.reports, columns, getCoreRowModel: getCoreRowModel() });
+  return <div className="stack"><SurfaceHeader eyebrow="Workspace · firm record" title="Reports" description="A simple archive for client, case, outcome, date, and the editorial record behind the conclusion." /><section className="surface-panel panel-pad"><div className="table-wrap"><table className="data-table"><thead>{table.getHeaderGroups().map((group) => <tr key={group.id}>{group.headers.map((header) => <th key={header.id}>{flexRender(header.column.columnDef.header, header.getContext())}</th>)}</tr>)}</thead><tbody>{table.getRowModel().rows.map((row) => <tr key={row.id} tabIndex={0} onClick={() => onNavigate("cases", row.original.engagementId)} onKeyDown={(event) => { if (event.key === "Enter") onNavigate("cases", row.original.engagementId); }}>{row.getVisibleCells().map((cell) => <td key={cell.id}>{flexRender(cell.column.columnDef.cell, cell.getContext())}</td>)}</tr>)}</tbody></table></div></section></div>;
+}
+
+function Clients({ data, onNavigate }: { data: PreviewData; onNavigate: Props["onNavigate"] }) {
+  return <div className="stack"><SurfaceHeader eyebrow="Workspace · client context" title="Clients" description="Answer: what is the security state of this client? Keep targets, active cases, findings, and reports visible without turning this into CRM CRUD." /><div className="client-list">{data.clients.map((client) => { const cases = data.engagements.filter((item) => item.clientId === client.clientId); const activeCases = cases.filter((item) => !["closed", "refused", "revoked"].includes(item.status)); const findings = data.findings.filter((finding) => finding.status === "open" && activeCases.some((item) => item.engagementId === finding.engagementId)); const reports = data.reports.filter((report) => cases.some((item) => item.engagementId === report.engagementId)); return <section className="surface-panel panel-pad client-summary" key={client.clientId}><div><p className="eyebrow">{client.clientId}</p><h2 className="panel-title">{client.name}</h2><Status value={client.status} /></div><div className="client-metrics"><span><strong>{client.targetCount}</strong> targets</span><span><strong>{activeCases.length}</strong> active cases</span><span><strong>{findings.length}</strong> open findings</span><span><strong>{reports.length}</strong> reports</span></div><button className="button" type="button" onClick={() => onNavigate("cases", cases[0]?.engagementId)}>View case state <ArrowUpRight size={15} aria-hidden="true" /></button></section>; })}</div><section className="surface-panel panel-pad"><p className="eyebrow">Target registry</p><h2 className="panel-title">Snapshot separation</h2><div className="table-wrap"><table className="data-table"><thead><tr><th>Target</th><th>Client</th><th>Kind</th><th>Snapshot</th><th>Live checkout</th></tr></thead><tbody>{data.targets.map((target) => <tr key={target.targetId}><td><div className="primary-cell"><strong>{target.name}</strong><span className="cell-note mono">{target.targetId}</span></div></td><td className="mono">{target.clientId}</td><td>{target.kind}</td><td><Status value={target.snapshot} /></td><td><Status value={target.liveCheckout} /></td></tr>)}</tbody></table></div></section></div>;
+}
+
+function SettingsSurface({ onNavigate }: { onNavigate: Props["onNavigate"] }) {
+  const settings = [{ key: "governance" as const, label: "Policies", detail: "Canonical hierarchy, deny-by-default, and permission decisions.", icon: LockKeyhole }, { key: "capabilities" as const, label: "Agents & capabilities", detail: "Bounded activity, tools, manifests, and sandbox context.", icon: Wrench }, { key: "audit" as const, label: "Audit", detail: "Append-only reconstruction and exact request identity.", icon: FileCheck2 }, { key: "skills" as const, label: "Skills", detail: "Qualification-linked institutional memory.", icon: FlaskConical }, { key: "runtime" as const, label: "Runtime", detail: "Integration mode, read models, and explicit unavailable states.", icon: SlidersHorizontal }];
+  return <div className="stack"><SurfaceHeader eyebrow="Administration · expert territory" title="Settings" description="Advanced machinery stays one level away until the context requires it." /><div className="settings-list">{settings.map(({ key, label, detail, icon: Icon }) => <button className="settings-row" type="button" key={key} onClick={() => onNavigate(key)}><span className="settings-icon"><Icon size={18} aria-hidden="true" /></span><span><strong>{label}</strong><small>{detail}</small></span><ChevronRight size={16} aria-hidden="true" /></button>)}</div><section className="surface-panel panel-pad"><p className="eyebrow">Contextual expert views</p><h2 className="panel-title">Open only when the case calls for them</h2><div className="expert-links">{expertRoutes.filter((route) => ["findings", "evidence", "approvals"].includes(route.key)).map((route) => <button className="filter-chip" type="button" key={route.key} onClick={() => onNavigate(route.key)}>{route.label} <ArrowUpRight size={14} aria-hidden="true" /></button>)}</div></section></div>;
+}
+
+function Runtime({ mode, data }: { mode: DisplayMode; data: PreviewData }) {
+  return <div className="stack"><SurfaceHeader eyebrow="Settings · runtime" title="Runtime" description="The browser shows integration posture without silently substituting preview data." /><section className="surface-panel panel-pad"><div className="runtime-state"><span className="pip" aria-hidden="true" /><div><strong>{mode === "PREVIEW" ? "PREVIEW" : mode}</strong><p className="small muted">{mode === "PREVIEW" ? "Synthetic, non-personal, non-client qualification data. Read-only; mutations disabled." : mode === "CONFIG_ERROR" ? "Configuration is invalid. No preview fallback is active." : "Controlled API boundary; live qualification remains not validated here."}</p></div></div><div className="divider" /><div className="lens-list"><div className="lens-row"><dt>Raw evidence in browser</dt><dd>never</dd></div><div className="lens-row"><dt>Canonical policy</dt><dd>backend-owned</dd></div><div className="lens-row"><dt>Interpretation</dt><dd>bounded by the canonical report</dd></div></div></section><section className="surface-panel panel-pad" aria-labelledby="service-catalog-title"><div className="table-toolbar"><div><p className="eyebrow">Qualification boundary</p><h2 className="panel-title" id="service-catalog-title">Security service catalog</h2><p className="panel-description">Qualification states are explicit; unavailable or unvalidated services are never implied to be clean.</p></div><Status value="not validated" /></div><div className="table-wrap"><table className="data-table"><thead><tr><th>Service</th><th>Version</th><th>Qualification</th><th>Visibility</th><th>Target classes</th></tr></thead><tbody>{data.securityServices.map((service) => <tr key={service.serviceId}><td><div className="primary-cell"><strong>{service.name}</strong><span className="cell-note mono">{service.serviceId}</span></div></td><td className="mono">{service.version}</td><td><Status value={service.qualificationState} /></td><td><Status value={service.visibility} /></td><td>{service.supportedTargetTypes.join(" · ")}</td></tr>)}</tbody></table></div></section></div>;
+}
+
+function Governance() {
+  const levels = [["Firm Charter", "fixed principles"], ["AGENTS.md", "repo authority"], ["Policy", "deterministic decision"], ["Case contract", "scope + authority"], ["Tool manifest", "bounded execution"], ["Approval", "exact binding"]];
+  return <div className="stack"><SurfaceHeader eyebrow="Settings · authority" title="Policies" description="The browser explains canonical authority; it never recreates or adjudicates it." /><section className="surface-panel panel-pad"><div className="panel-header"><div><p className="eyebrow">Hierarchy</p><h2 className="panel-title">Authority stack</h2></div><Status value="deny by default" /></div><div className="trace">{levels.map(([title, detail], index) => <div className="trace-step" key={title}><span className="trace-icon">{index + 1}</span><div className="trace-card"><strong>{title}</strong><p>{detail}</p></div></div>)}</div></section></div>;
+}
+
+function Audit({ data }: { data: PreviewData }) {
+  return <div className="stack"><SurfaceHeader eyebrow="Settings · reconstruction" title="Audit" description="Append-only event history for deterministic reconstruction." /><section className="surface-panel panel-pad"><div className="filter-row" aria-label="Audit filters"><button className="filter-chip selected" type="button">all events</button><button className="filter-chip" type="button">case</button><button className="filter-chip" type="button">principal</button><button className="filter-chip" type="button">decision</button></div><div className="divider" /><div className="trace">{data.audit.map((event) => <div className="trace-step" key={event.auditEventId}><span className="trace-icon" aria-hidden="true">⌁</span><div className="trace-card"><div className="chip-row"><strong>{event.summary}</strong><Status value={event.kind} /></div><p className="mono">{event.auditEventId} · {event.occurredAt} · {event.principalId ?? "system"} · {event.relatedIds.join(" · ")}</p></div></div>)}</div></section></div>;
+}
+
+function Skills() {
+  return <div className="stack"><SurfaceHeader eyebrow="Settings · institutional memory" title="Skills" description="Qualification-linked evolution for the firm’s operating knowledge." /><section className="surface-panel panel-pad"><div className="case-facts"><span><strong>Observe</strong> evidence</span><span><strong>Test</strong> behavior</span><span><strong>Review</strong> authority</span><span><strong>Reuse</strong> safely</span></div></section><div className="three-grid"><section className="surface-panel panel-pad"><p className="eyebrow">secscan-product-uxui</p><h2 className="panel-title">v0.2.0 · REFINE</h2><p className="panel-description">Attention-first, plain-language, contextual detail, and explicit preview states.</p><Status value="active" /></section></div></div>;
+}
+
+function AssistantSurface({ onOpenAssistant }: { onOpenAssistant: Props["onOpenAssistant"] }) {
+  return <div className="stack"><SurfaceHeader eyebrow="Context lens · grounded only" title="Ask" description="The assistant is a contextual lens, not the primary navigation paradigm." action={<button className="button primary" type="button" onClick={onOpenAssistant}><MessageCircleQuestion size={15} aria-hidden="true" /> Open context lens</button>} /><section className="grounding-box"><strong>GROUNDED · READ-ONLY</strong><p className="small muted">Visible case records only. It can explain and navigate; it cannot approve, mutate, or change findings.</p></section></div>;
+}
+
+export function SurfaceView({ surface, selectedId, data, mode, onNavigate, onOpenAssistant, onMutationAttempt }: Props) {
+  if (!data) return <IntegratedEmpty mode={mode} />;
+  switch (normalizeSurface(surface)) {
+    case "today": return <CommandCenter data={data} onNavigate={onNavigate} />;
+    case "cases": return selectedId ? <CaseCenter data={data} id={selectedId} mode={mode} onNavigate={onNavigate} /> : <CasesIndex data={data} mode={mode} onNavigate={onNavigate} />;
+    case "findings": return selectedId ? <FindingDetail data={data} id={selectedId} onNavigate={onNavigate} /> : <FindingsIndex data={data} onNavigate={onNavigate} />;
+    case "evidence": return <EvidenceVault data={data} id={selectedId} onNavigate={onNavigate} />;
+    case "runs": return <AgentRuns data={data} />;
+    case "capabilities": return <CapabilityExecution data={data} />;
+    case "approvals": return <Approvals data={data} mode={mode} onMutationAttempt={onMutationAttempt} />;
+    case "reports": return <Reports data={data} onNavigate={onNavigate} />;
+    case "clients": return <Clients data={data} onNavigate={onNavigate} />;
+    case "settings": return <SettingsSurface onNavigate={onNavigate} />;
+    case "runtime": return <Runtime mode={mode} data={data} />;
+    case "governance": return <Governance />;
+    case "audit": return <Audit data={data} />;
+    case "skills": return <Skills />;
+    case "assistant": return <AssistantSurface onOpenAssistant={onOpenAssistant} />;
+    default: return <IntegratedEmpty mode={mode} />;
+  }
+}

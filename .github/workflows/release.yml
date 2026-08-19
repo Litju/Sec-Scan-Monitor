@@ -1,0 +1,38 @@
+name: Public provenance dry run
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - "v[0-9]+.[0-9]+.[0-9]+"
+
+permissions:
+  contents: read
+
+jobs:
+  build-provenance:
+    name: Build SBOM and provenance
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+      attestations: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+      - name: Set up Python
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
+        with:
+          python-version: "3.12"
+      - name: Build deterministic SBOM
+        run: python scripts/release/build_sbom.py --output dist/secscanmonitor.cdx.json
+      - name: Upload SBOM
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: secscanmonitor-sbom
+          path: dist/secscanmonitor.cdx.json
+          if-no-files-found: error
+      - name: Attest SBOM provenance
+        uses: actions/attest@67422f5511b7ff725f4dbd6fb9bd2cd925c65a8d
+        with:
+          subject-path: dist/secscanmonitor.cdx.json
