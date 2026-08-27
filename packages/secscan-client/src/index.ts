@@ -1,4 +1,4 @@
-import type { DataMode } from "../../secscan-experience-contracts/src/index";
+import type { DataMode } from "@secscanmonitor/experience-contracts";
 
 export class ApiError extends Error {
   constructor(

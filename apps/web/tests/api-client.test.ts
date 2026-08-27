@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { createApiClient, getHostedAuthToken, PreviewReadOnlyError, resolveApiMode } from "@/lib/api/client";
-import { createCanonicalClient } from "../../../packages/secscan-client/src/index";
+import { createCanonicalClient } from "@secscanmonitor/client";
 
 vi.mock("@neondatabase/auth", () => ({
   createInternalNeonAuth: () => ({ getJWTToken: async () => "opaque-session-token" }),

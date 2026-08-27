@@ -10,9 +10,9 @@ import type {
   PreviewData,
   ReportView,
 } from "@/lib/domain/types";
-import { ApiError, createCanonicalClient } from "../../../../packages/secscan-client/src/index";
+import { ApiError, createCanonicalClient } from "@secscanmonitor/client";
 
-export { ApiError, PreviewReadOnlyError } from "../../../../packages/secscan-client/src/index";
+export { ApiError, PreviewReadOnlyError } from "@secscanmonitor/client";
 
 type HostedPage<T> = { items: T[]; next_cursor: string | null; limit: number };
 
