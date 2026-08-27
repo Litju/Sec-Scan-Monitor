@@ -540,6 +540,33 @@ class WorkflowSideEffectRow(Base):
     recorded_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
 
 
+class SecurityGraphSnapshotRow(Base):
+    """Canonical PostgreSQL record for one deterministic security graph."""
+
+    __tablename__ = "security_graph_snapshots"
+    snapshot_id: Mapped[str] = mapped_column(String(128), primary_key=True)
+    tenant_id: Mapped[str] = mapped_column(String(128), index=True)
+    case_id: Mapped[str] = mapped_column(String(128), index=True)
+    target_id: Mapped[str] = mapped_column(String(128), index=True)
+    digest: Mapped[str] = mapped_column(String(64))
+    normalization_version: Mapped[str] = mapped_column(String(64), default="security-graph-v1")
+    canonical_state: Mapped[dict[str, Any]] = mapped_column(JSON)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
+
+    nodes: Mapped[list["SecurityGraphNodeRow"]] = relationship(
+        back_populates="snapshot", cascade="all, delete-orphan"
+    )
+    edges: Mapped[list["SecurityGraphEdgeRow"]] = relationship(
+        back_populates="snapshot", cascade="all, delete-orphan"
+    )
+
+    __table_args__ = (
+        UniqueConstraint(
+            "tenant_id", "case_id", "target_id", "digest", name="uq_security_graph_scope_digest"
+        ),
+    )
+
+
 class TargetSecurityProfileRow(Base):
     """Snapshot-bound profile facts; raw source content is never persisted here."""
 
@@ -574,6 +601,35 @@ class AssessmentPlanRow(Base):
             name="fk_assessment_plan_engagement_target",
         ),
     )
+
+
+class SecurityGraphNodeRow(Base):
+    __tablename__ = "security_graph_nodes"
+    snapshot_id: Mapped[str] = mapped_column(
+        ForeignKey("security_graph_snapshots.snapshot_id", ondelete="CASCADE"), primary_key=True
+    )
+    node_key: Mapped[str] = mapped_column(String(255), primary_key=True)
+    entity_type: Mapped[str] = mapped_column(String(64), index=True)
+    entity_id: Mapped[str] = mapped_column(String(128), index=True)
+    attributes: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
+    provenance: Mapped[list[Any]] = mapped_column(JSON, default=list)
+
+    snapshot: Mapped["SecurityGraphSnapshotRow"] = relationship(back_populates="nodes")
+
+
+class SecurityGraphEdgeRow(Base):
+    __tablename__ = "security_graph_edges"
+    snapshot_id: Mapped[str] = mapped_column(
+        ForeignKey("security_graph_snapshots.snapshot_id", ondelete="CASCADE"), primary_key=True
+    )
+    edge_id: Mapped[str] = mapped_column(String(96), primary_key=True)
+    source_node: Mapped[str] = mapped_column(String(255), index=True)
+    target_node: Mapped[str] = mapped_column(String(255), index=True)
+    relation: Mapped[str] = mapped_column(String(64), index=True)
+    attributes: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
+    provenance: Mapped[list[Any]] = mapped_column(JSON, default=list)
+
+    snapshot: Mapped["SecurityGraphSnapshotRow"] = relationship(back_populates="edges")
 
 
 class SecurityServiceRunRow(Base):

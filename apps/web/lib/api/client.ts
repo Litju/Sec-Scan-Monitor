@@ -10,24 +10,9 @@ import type {
   PreviewData,
   ReportView,
 } from "@/lib/domain/types";
+import { ApiError, createCanonicalClient } from "../../../../packages/secscan-client/src/index";
 
-export class ApiError extends Error {
-  constructor(
-    message: string,
-    readonly status: number,
-    readonly endpoint: string,
-  ) {
-    super(message);
-    this.name = "ApiError";
-  }
-}
-
-export class PreviewReadOnlyError extends Error {
-  constructor(action: string) {
-    super(`Preview mode is read-only; ${action} is disabled.`);
-    this.name = "PreviewReadOnlyError";
-  }
-}
+export { ApiError, PreviewReadOnlyError } from "../../../../packages/secscan-client/src/index";
 
 type HostedPage<T> = { items: T[]; next_cursor: string | null; limit: number };
 
@@ -81,6 +66,19 @@ type HostedAudit = {
   summary: string;
   occurred_at: string;
 };
+type HostedApproval = {
+  approval_id: string;
+  engagement_id: string;
+  requested_by: string;
+  request_ref: string;
+  target_id: string;
+  capability_id: string;
+  action: string;
+  risk: string;
+  decision: "pending" | "approved" | "denied";
+  request_fingerprint: string;
+  rationale: string;
+};
 type HostedReport = {
   report_id: string;
   engagement_id: string;
@@ -120,7 +118,9 @@ export async function getHostedAuthToken(endpoint = "/auth/revoke"): Promise<str
 }
 
 export function resolveApiMode(): DataMode {
-  const configured = process.env.NEXT_PUBLIC_SECSCAN_MODE?.trim().toUpperCase();
+  const configured =
+    process.env.NEXT_PUBLIC_SECSCAN_QUALIFICATION_MODE?.trim().toUpperCase()
+    || process.env.NEXT_PUBLIC_SECSCAN_MODE?.trim().toUpperCase();
   if (!configured) return "PREVIEW";
   if (configured === "PREVIEW" || configured === "LOCAL_INTEGRATED" || configured === "HOSTED_INTEGRATED") {
     return configured;
@@ -129,36 +129,9 @@ export function resolveApiMode(): DataMode {
 }
 
 export function createApiClient(mode: DataMode = resolveApiMode()) {
-  async function get<T>(endpoint: string): Promise<T> {
-    if (mode === "PREVIEW") throw new PreviewReadOnlyError(`GET ${endpoint}`);
-    const headers: Record<string, string> = { Accept: "application/json" };
-    if (mode === "HOSTED_INTEGRATED") headers.Authorization = await hostedAuthorization(endpoint);
-    const response = await fetch(`/api/secscan${endpoint}`, {
-      headers,
-      cache: "no-store",
-    });
-    if (!response.ok) {
-      throw new ApiError(`SecScanMonitor API returned ${response.status}.`, response.status, endpoint);
-    }
-    return (await response.json()) as T;
-  }
-
-  async function mutate<T>(endpoint: string, method: "POST", payload?: unknown): Promise<T> {
-    if (mode === "PREVIEW") throw new PreviewReadOnlyError(`${method} ${endpoint}`);
-    const headers: Record<string, string> = { Accept: "application/json" };
-    if (payload !== undefined) headers["Content-Type"] = "application/json";
-    if (mode === "HOSTED_INTEGRATED") headers.Authorization = await hostedAuthorization(endpoint);
-    const response = await fetch(`/api/secscan${endpoint}`, {
-      method,
-      headers,
-      body: payload === undefined ? undefined : JSON.stringify(payload),
-      cache: "no-store",
-    });
-    if (!response.ok) {
-      throw new ApiError(`SecScanMonitor API returned ${response.status}.`, response.status, endpoint);
-    }
-    return (await response.json()) as T;
-  }
+  const transport = createCanonicalClient({ mode, getAuthorization: mode === "HOSTED_INTEGRATED" ? hostedAuthorization : undefined });
+  const get = transport.get;
+  const mutate = <T>(endpoint: string, _method: "POST", payload?: unknown) => transport.post<T>(endpoint, payload);
 
   return {
     mode,
@@ -177,6 +150,7 @@ export function createApiClient(mode: DataMode = resolveApiMode()) {
     getEvidencePage: () => get<HostedPage<HostedEvidence>>("/evidence"),
     getServices: () => get<HostedService[]>("/services"),
     getAudit: () => get<HostedPage<HostedAudit>>("/audit"),
+    getApprovals: () => get<HostedPage<HostedApproval>>("/approvals"),
     createEngagement: (payload: {
       engagement_id: string;
       client_id: string;
@@ -198,8 +172,8 @@ export function createApiClient(mode: DataMode = resolveApiMode()) {
   };
 }
 
-export async function loadHostedData(): Promise<PreviewData> {
-  const api = createApiClient("HOSTED_INTEGRATED");
+export async function loadHostedData(mode: DataMode = "HOSTED_INTEGRATED"): Promise<PreviewData> {
+  const api = createApiClient(mode);
   const [clientsPage, targetsPage, engagementsPage, findingsPage, evidencePage, auditPage] = await Promise.all([
     api.getClients(),
     api.getTargets(),
@@ -208,6 +182,7 @@ export async function loadHostedData(): Promise<PreviewData> {
     api.getEvidencePage(),
     api.getAudit(),
   ]);
+  const approvalsPage = mode === "LOCAL_INTEGRATED" ? await api.getApprovals() : { items: [] as HostedApproval[] };
   const clientNames = new Map(clientsPage.items.map((client) => [client.client_id, client.name]));
   const targets = targetsPage.items;
   const targetById = new Map(targets.map((target) => [target.target_id, target]));
@@ -317,15 +292,28 @@ export async function loadHostedData(): Promise<PreviewData> {
     }
   }))).filter((report): report is ReportView => report !== null);
   return {
-    mode: "HOSTED_INTEGRATED",
-    originLabel: "HOSTED / AUTHENTICATED / CANONICAL_POSTGRESQL",
+    mode,
+    originLabel: mode === "LOCAL_INTEGRATED" ? "LOCAL / LOOPBACK / LIVE_QUALIFICATION_CANONICAL" : "HOSTED / AUTHENTICATED / CANONICAL_POSTGRESQL",
     engagements,
     findings,
     evidence,
     runs: runsByEngagement.flat(),
     capabilities: [],
     securityServices: [],
-    approvals: [],
+    approvals: approvalsPage.items.map((approval): ApprovalView => ({
+      approvalId: approval.approval_id,
+      engagementId: approval.engagement_id,
+      requestedBy: approval.requested_by,
+      requestRef: approval.request_ref,
+      targetId: approval.target_id,
+      capabilityId: approval.capability_id,
+      action: approval.action,
+      risk: approval.risk,
+      decision: approval.decision,
+      requestFingerprint: approval.request_fingerprint,
+      rationale: approval.rationale,
+      origin: "API",
+    })),
     clients: clientsPage.items.map((client) => ({
       clientId: client.client_id,
       name: client.name,
@@ -355,5 +343,7 @@ export async function loadHostedData(): Promise<PreviewData> {
       relatedIds: [],
       origin: "API",
     })),
+    graphNodes: [],
+    graphEdges: [],
   };
 }

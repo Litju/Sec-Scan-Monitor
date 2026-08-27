@@ -162,4 +162,13 @@ export const previewData: PreviewData = {
   audit: [
     { auditEventId: "AUD-015-17", engagementId: "ENG-PUBLIC-015", principalId: "operator-local", kind: "policy_decision", summary: "CAP-ADVISORY-READ evaluated within inspection-only scope.", occurredAt: "2026-08-15T17:43:00Z", relatedIds: ["AR-015-COORD-01"], origin },
   ],
+  graphNodes: [
+    { id: "node-snapshot", kind: "snapshot", label: "immutable repository snapshot", state: "VERIFIED", relatedIds: ["FND-PREV-015"], scope: { tenantId: "tenant-preview", caseId: "ENG-PUBLIC-015" }, provenance: { source: "snapshot registry", sourceType: "preview", observedAt: "2026-08-15T18:40:00Z", evidenceRefs: ["E-1181"], status: "VERIFIED" } },
+    { id: "node-finding", kind: "finding", label: "Advisory data is unavailable for the review capability.", state: "INCONCLUSIVE", relatedIds: ["FND-PREV-015"], scope: { tenantId: "tenant-preview", caseId: "ENG-PUBLIC-015" }, provenance: { source: "patrol projection", sourceType: "preview", observedAt: "2026-08-15T18:40:00Z", evidenceRefs: ["E-1181"], status: "INCONCLUSIVE" } },
+    { id: "node-capability", kind: "capability", label: "CAP-ADVISORY-READ", state: "APPROVAL_REQUIRED", relatedIds: ["FND-PREV-015"], scope: { tenantId: "tenant-preview", caseId: "ENG-PUBLIC-015" }, provenance: { source: "capability registry", sourceType: "preview", observedAt: "2026-08-15T17:43:00Z", evidenceRefs: [], status: "APPROVAL_REQUIRED" } },
+  ],
+  graphEdges: [
+    { id: "edge-snapshot-finding", sourceId: "node-snapshot", targetId: "node-finding", relation: "supports", state: "VERIFIED", relatedIds: ["FND-PREV-015"], scope: { tenantId: "tenant-preview", caseId: "ENG-PUBLIC-015" }, provenance: { source: "evidence linkage", sourceType: "preview", observedAt: "2026-08-15T18:40:00Z", evidenceRefs: ["E-1181"], status: "VERIFIED" } },
+    { id: "edge-finding-capability", sourceId: "node-finding", targetId: "node-capability", relation: "depends on", state: "INCONCLUSIVE", relatedIds: ["FND-PREV-015"], scope: { tenantId: "tenant-preview", caseId: "ENG-PUBLIC-015" }, provenance: { source: "patrol projection", sourceType: "preview", observedAt: "2026-08-15T18:40:00Z", evidenceRefs: ["E-1181"], status: "INCONCLUSIVE" } },
+  ],
 };

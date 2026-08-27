@@ -15,6 +15,10 @@ _FORBIDDEN_VALUE_PATTERNS = (
     re.compile(r"-----BEGIN [A-Z ]+PRIVATE KEY-----"),
     re.compile(r"AIza[0-9A-Za-z\-_]{35}"),
     re.compile(r"(?i)bitlocker.*recovery"),
+    re.compile(
+        r"(?i)\b[a-z0-9_]*(?:password|passwd|pwd|api[_-]?key|apikey|secret|token|authorization)"
+        r"(?:\\?['\"])?\s*[:=]\s*(?:\\?['\"])?[^,\\\s}\"']+(?:\\?['\"])?"
+    ),
 )
 
 

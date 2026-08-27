@@ -18,6 +18,7 @@ def _python_components(lock_path: Path) -> list[dict[str, Any]]:
         if not line or line.startswith("#") or "==" not in line:
             continue
         name, version = (part.strip() for part in line.split("==", 1))
+        version = version.split(";", 1)[0].rstrip("\\").strip()
         if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]*", name) or not version:
             raise ValueError(f"invalid Python lock entry: {line!r}")
         components.append(

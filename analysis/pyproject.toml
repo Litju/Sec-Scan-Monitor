@@ -16,6 +16,7 @@ dependencies = [
   "opentelemetry-api==1.36.0",
   "opentelemetry-sdk==1.36.0",
   "opentelemetry-exporter-otlp-proto-http==1.36.0",
+  "cryptography>=41,<51",
 ]
 
 [project.optional-dependencies]

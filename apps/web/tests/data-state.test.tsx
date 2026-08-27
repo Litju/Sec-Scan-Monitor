@@ -18,4 +18,12 @@ describe("semantic state presentation", () => {
     expect(screen.getByText("raw bytes withheld")).toBeInTheDocument();
     expect(screen.getByText(/Metadata detail only/i)).toBeInTheDocument();
   });
+
+  it("renders graph context as a bounded, provenance-bearing accessible list", () => {
+    render(<QueryProvider><ProductSurface initialSurface="findings" initialId="FND-PREV-015" /></QueryProvider>);
+    expect(screen.getByRole("heading", { name: "Affected path" })).toBeInTheDocument();
+    expect(screen.getByText(/browser does not infer edges/i)).toBeInTheDocument();
+    expect(screen.getByText("immutable repository snapshot")).toBeInTheDocument();
+    expect(screen.getByText(/evidence linkage/i)).toBeInTheDocument();
+  });
 });

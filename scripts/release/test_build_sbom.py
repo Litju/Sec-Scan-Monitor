@@ -15,6 +15,25 @@ SPEC.loader.exec_module(MODULE)
 
 
 class SbomTests(unittest.TestCase):
+    def test_uv_lock_continuations_and_markers_are_normalized(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="SecScanMonitor-") as raw_root:
+            lock_path = Path(raw_root) / "requirements.lock"
+            lock_path.write_text(
+                """cbor2==6.1.4 \\
+    --hash=sha256:fixture
+pywin32==312 ; sys_platform == 'win32' \\
+    --hash=sha256:fixture
+""",
+                encoding="utf-8",
+            )
+
+            components = MODULE._python_components(lock_path)
+
+            self.assertEqual(
+                [(component["name"], component["version"]) for component in components],
+                [("cbor2", "6.1.4"), ("pywin32", "312")],
+            )
+
     def test_lockfile_inventory_is_deterministic(self) -> None:
         with tempfile.TemporaryDirectory(prefix="SecScanMonitor-") as raw_root:
             root = Path(raw_root)
