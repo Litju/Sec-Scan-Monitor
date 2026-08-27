@@ -26,7 +26,11 @@ type CanonicalClientOptions = {
 };
 
 function joinUrl(baseUrl: string, endpoint: string): string {
-  return `${baseUrl.replace(/\/+$/, "")}/${endpoint.replace(/^\/+/, "")}`;
+  let baseEnd = baseUrl.length;
+  while (baseEnd > 0 && baseUrl[baseEnd - 1] === "/") baseEnd -= 1;
+  let endpointStart = 0;
+  while (endpointStart < endpoint.length && endpoint[endpointStart] === "/") endpointStart += 1;
+  return `${baseUrl.slice(0, baseEnd)}/${endpoint.slice(endpointStart)}`;
 }
 
 export function createCanonicalClient({ mode, baseUrl = "/api/secscan", fetchImpl = fetch, getAuthorization }: CanonicalClientOptions) {
