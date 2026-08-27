@@ -1,4 +1,6 @@
-export type DataMode = "PREVIEW" | "LOCAL_INTEGRATED" | "HOSTED_INTEGRATED";
+import type { DataMode as ExperienceDataMode, GraphEdgeView, GraphNodeView } from "../../../../packages/secscan-experience-contracts/src/index";
+
+export type DataMode = ExperienceDataMode;
 
 export type SubsystemStatus = "qualified" | "available" | "degraded" | "unavailable" | "not_validated";
 
@@ -181,4 +183,6 @@ export type PreviewData = {
   targets: TargetView[];
   reports: ReportView[];
   audit: AuditEventView[];
+  graphNodes: GraphNodeView[];
+  graphEdges: GraphEdgeView[];
 };

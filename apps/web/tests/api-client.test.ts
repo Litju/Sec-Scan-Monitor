@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { createApiClient, getHostedAuthToken, PreviewReadOnlyError, resolveApiMode } from "@/lib/api/client";
+import { createCanonicalClient } from "@secscanmonitor/client";
 
 vi.mock("@neondatabase/auth", () => ({
   createInternalNeonAuth: () => ({ getJWTToken: async () => "opaque-session-token" }),
@@ -31,6 +32,12 @@ describe("SecScan API mode boundary", () => {
     const health = await createApiClient("LOCAL_INTEGRATED").health();
     expect(health.service).toBe("secscan-platform");
     expect(fetchMock).toHaveBeenCalledWith("/api/secscan/health", expect.objectContaining({ headers: { Accept: "application/json" } }));
+  });
+
+  it("normalizes URL boundaries with bounded scans", async () => {
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response(JSON.stringify({ status: "ok" }), { status: 200 }));
+    await createCanonicalClient({ mode: "LOCAL_INTEGRATED", baseUrl: "/api/secscan////" }).get("////health");
+    expect(fetchMock).toHaveBeenCalledWith("/api/secscan/health", expect.objectContaining({ cache: "no-store" }));
   });
 
   it("fails closed when hosted authentication is not configured", async () => {

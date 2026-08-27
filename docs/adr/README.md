@@ -16,3 +16,5 @@ Format: context / decision / consequences. Superseded ADRs are marked, never del
 | ADR-0009 | Sandbox execution (Docker now, microVM later) | accepted |
 | ADR-0010 | OpenTelemetry observability | accepted |
 | ADR-0011 | LLM/tool output as untrusted evidence | accepted |
+| ADR-0012 | Hosted control-plane composition for isolated staging | accepted for isolated staging |
+| ADR-0013 | Continuous security foundation V1 | accepted for private v0.2 qualification |

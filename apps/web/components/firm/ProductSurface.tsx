@@ -90,9 +90,9 @@ function FirmRail({ surface, onNavigate }: { surface: SurfaceKey; onNavigate: (s
   );
 }
 
-function CommandBar({ route, mode, health, notice, onOpenPalette }: { route: ReturnType<typeof getRouteDefinition>; mode: DisplayMode; health: string; notice: string; onOpenPalette: () => void }) {
+function CommandBar({ route, mode, health, onOpenPalette }: { route: ReturnType<typeof getRouteDefinition>; mode: DisplayMode; health: string; onOpenPalette: () => void }) {
   const isPreview = mode === "PREVIEW";
-  return <header className="command-bar"><div className="context-block"><div className="context-eyebrow">{route.eyebrow}</div><div className="context-title">{route.label} <span className="muted">· {isPreview ? "PREVIEW" : mode.replaceAll("_", " ")}</span></div></div><div className="command-actions"><Button className="search-trigger" type="button" onClick={onOpenPalette} aria-label="Open search and ask" variant="outline" size="lg"><Search size={15} aria-hidden="true" /><span>Search / Ask</span><span className="shortcut">⌘ K</span></Button><div className="live-status" aria-label="Live data status" aria-live="polite"><span className={`pip ${health === "API unavailable" ? "offline" : health === "not validated" ? "degraded" : ""}`} aria-hidden="true" /><span>{isPreview ? "Preview · read-only" : health}</span>{notice ? <span className="command-notice">{notice}</span> : null}</div></div></header>;
+  return <header className="command-bar"><div className="context-block"><div className="context-eyebrow">{route.eyebrow}</div><div className="context-title">{route.label} <span className="muted">· {isPreview ? "PREVIEW" : mode.replaceAll("_", " ")}</span></div></div><div className="command-actions"><Button className="search-trigger" type="button" onClick={onOpenPalette} aria-label="Open search and ask" variant="outline" size="lg"><Search size={15} aria-hidden="true" /><span>Search / Ask</span><span className="shortcut">⌘ K</span></Button><div className="live-status" aria-label="Live data status" aria-live="polite"><span className={`pip ${health === "API unavailable" ? "offline" : health === "not validated" ? "degraded" : ""}`} aria-hidden="true" /><span>{isPreview ? "Preview · read-only" : health}</span></div></div></header>;
 }
 
 function CommandPalette({ open, entries, onClose, onSelect, onAsk }: { open: boolean; entries: PaletteEntry[]; onClose: () => void; onSelect: (entry: PaletteEntry) => void; onAsk: () => void }) {
@@ -114,17 +114,16 @@ export function ProductSurface({ initialSurface, initialId }: Props) {
   const [mode] = useState<DisplayMode>(readMode);
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [assistantOpen, setAssistantOpen] = useState(normalizedInitial === "assistant");
-  const [notice, setNotice] = useState("");
   const route = getRouteDefinition(surface);
   const flow = flowBySurface[surface] ?? flowBySurface.today!;
-  const hostedDataQuery = useQuery({
-    queryKey: ["secscan-hosted-data"],
-    queryFn: loadHostedData,
-    enabled: mode === "HOSTED_INTEGRATED",
+  const integratedDataQuery = useQuery({
+    queryKey: ["secscan-integrated-data", mode],
+    queryFn: () => loadHostedData(mode as DataMode),
+    enabled: mode === "HOSTED_INTEGRATED" || mode === "LOCAL_INTEGRATED",
     refetchInterval: 5_000,
     retry: 1,
   });
-  const data = mode === "PREVIEW" ? previewData : mode === "HOSTED_INTEGRATED" ? hostedDataQuery.data ?? null : null;
+  const data = mode === "PREVIEW" ? previewData : mode === "CONFIG_ERROR" ? null : integratedDataQuery.data ?? null;
   const flowStyle = { "--flow-a": flow.a, "--flow-b": flow.b, "--flow-c": flow.c } as CSSProperties;
   const healthQuery = useQuery({
     queryKey: ["secscan-health", mode],
@@ -155,11 +154,6 @@ export function ProductSurface({ initialSurface, initialId }: Props) {
     window.history.pushState({}, "", pathForSurface(next, id));
   }
 
-  function mutationAttempt(message: string) {
-    setNotice(message);
-    window.setTimeout(() => setNotice(""), 2800);
-  }
-
   const paletteEntries = useMemo<PaletteEntry[]>(() => {
     const routes: PaletteEntry[] = surfaceRoutes.filter((item) => item.group !== "legacy").map((item) => ({ id: `route-${item.key}`, title: item.label, detail: item.description, type: "route", surface: item.key }));
     if (!data) return routes;
@@ -173,5 +167,5 @@ export function ProductSurface({ initialSurface, initialId }: Props) {
     );
   }, [data]);
 
-  return <div style={flowStyle}><a className="skip-link" href="#main-content">Skip to main content</a><div className="app-shell"><FirmRail surface={surface} onNavigate={navigate} /><div className="main-stage"><CommandBar route={route} mode={mode} health={health} notice={notice} onOpenPalette={() => setPaletteOpen(true)} /><main className="page-canvas" id="main-content">{mode === "CONFIG_ERROR" ? <div className="status-line error-state" role="alert">Frontend mode configuration is invalid. No preview fallback was activated.</div> : null}{mode === "HOSTED_INTEGRATED" && hostedDataQuery.isError ? <div className="status-line error-state" role="alert">Canonical hosted read model is unavailable. No preview fallback was activated.</div> : null}<SurfaceView surface={surface} selectedId={selectedId} data={data} mode={mode} onNavigate={navigate} onOpenAssistant={() => setAssistantOpen(true)} onMutationAttempt={mutationAttempt} /></main></div></div><CommandPalette open={paletteOpen} entries={paletteEntries} onClose={() => setPaletteOpen(false)} onSelect={(entry) => navigate(entry.surface, entry.entityId)} onAsk={() => { setPaletteOpen(false); setAssistantOpen(true); }} /><AssistantDialog open={assistantOpen} onClose={() => setAssistantOpen(false)} /></div>;
+  return <div style={flowStyle}><a className="skip-link" href="#main-content">Skip to main content</a><div className="app-shell"><FirmRail surface={surface} onNavigate={navigate} /><div className="main-stage"><CommandBar route={route} mode={mode} health={health} onOpenPalette={() => setPaletteOpen(true)} /><main className="page-canvas" id="main-content">{mode === "CONFIG_ERROR" ? <div className="status-line error-state" role="alert">Frontend mode configuration is invalid. No preview fallback was activated.</div> : null}{mode !== "PREVIEW" && mode !== "CONFIG_ERROR" && integratedDataQuery.isError ? <div className="status-line error-state" role="alert">Canonical integrated read model is unavailable. No preview fallback was activated.</div> : null}<SurfaceView surface={surface} selectedId={selectedId} data={data} mode={mode} onNavigate={navigate} onOpenAssistant={() => setAssistantOpen(true)} /></main></div></div><CommandPalette open={paletteOpen} entries={paletteEntries} onClose={() => setPaletteOpen(false)} onSelect={(entry) => navigate(entry.surface, entry.entityId)} onAsk={() => { setPaletteOpen(false); setAssistantOpen(true); }} /><AssistantDialog open={assistantOpen} onClose={() => setAssistantOpen(false)} /></div>;
 }
