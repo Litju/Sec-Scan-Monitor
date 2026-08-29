@@ -18,3 +18,5 @@ Format: context / decision / consequences. Superseded ADRs are marked, never del
 | ADR-0011 | LLM/tool output as untrusted evidence | accepted |
 | ADR-0012 | Hosted control-plane composition for isolated staging | accepted for isolated staging |
 | ADR-0013 | Continuous security foundation V1 | accepted for private v0.2 qualification |
+| ADR-0014 | Detection and response firm foundation V1 | accepted for private v0.3 qualification |
+| ADR-0015 | Live detection-response control plane V1 | proposed for private ML-337 qualification |

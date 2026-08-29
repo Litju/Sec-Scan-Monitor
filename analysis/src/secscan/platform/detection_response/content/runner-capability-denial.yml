@@ -1,0 +1,20 @@
+title: SecScan edge runner capability denial
+id: secscan-v03-runner-capability-denial
+status: stable
+description: Detects a bounded edge-runner capability decision that requires review.
+author: SecScanMonitor
+references:
+  - https://atlas.mitre.org/
+tags:
+  - atlas.aml.t0080
+logsource:
+  product: edge_runner
+detection:
+  selection:
+    action: execute
+    outcome: denied
+    capability: privileged_runner
+  condition: selection
+level: medium
+x_secscan_confidence: high
+x_secscan_rationale: Runner capability decisions are linked to signed job and evidence references by the event plane.

@@ -40,6 +40,10 @@ const flowBySurface: Partial<Record<SurfaceKey, { a: string; b: string; c: strin
   reports: { a: "var(--quartz)", b: "var(--lapis)", c: "var(--deep-lapis)" },
   settings: { a: "var(--quartz)", b: "var(--orpiment)", c: "var(--deep-orpiment)" },
   findings: { a: "var(--orpiment)", b: "var(--cinnabar)", c: "var(--deep-cinnabar)" },
+  signals: { a: "var(--cinnabar)", b: "var(--orpiment)", c: "var(--deep-cinnabar)" },
+  hunts: { a: "var(--tyrian)", b: "var(--verdigris)", c: "var(--deep-verdigris)" },
+  incidents: { a: "var(--cinnabar)", b: "var(--prussian)", c: "var(--deep-prussian)" },
+  "response-proposals": { a: "var(--orpiment)", b: "var(--prussian)", c: "var(--deep-prussian)" },
   evidence: { a: "var(--verdigris)", b: "var(--lapis)", c: "var(--deep-lapis)" },
   runs: { a: "var(--tyrian)", b: "var(--prussian)", c: "var(--deep-prussian)" },
   capabilities: { a: "var(--prussian)", b: "var(--quartz)", c: "var(--deep-prussian)" },
@@ -164,6 +168,10 @@ export function ProductSurface({ initialSurface, initialId }: Props) {
       data.evidence.map((item) => ({ id: item.evidenceId, title: item.evidenceId, detail: `${item.collector} · ${item.sanitizationState}`, type: "evidence", surface: "evidence" as const, entityId: item.evidenceId })),
       data.reports.map((item) => ({ id: `report-${item.engagementId}`, title: item.title, detail: `${item.engagementId} · ${item.verdict}`, type: "report", surface: "reports" as const })),
       data.approvals.map((item) => ({ id: item.approvalId, title: item.approvalId, detail: `${item.capabilityId} · ${item.decision}`, type: "approval", surface: "approvals" as const, entityId: item.approvalId })),
+      (data.detectionSignals ?? []).map((item) => ({ id: item.signalId, title: item.signalId, detail: `${item.ruleId} · ${item.state}`, type: "signal", surface: "signals" as const, entityId: item.signalId })),
+      (data.hunts ?? []).map((item) => ({ id: item.huntId, title: item.huntId, detail: `${item.hypothesisId} · ${item.state}`, type: "hunt", surface: "hunts" as const, entityId: item.huntId })),
+      (data.incidents ?? []).map((item) => ({ id: item.incidentId, title: item.incidentId, detail: `${item.severity} · ${item.state}`, type: "incident", surface: "incidents" as const, entityId: item.incidentId })),
+      (data.responseProposals ?? []).map((item) => ({ id: item.proposalId, title: item.proposalId, detail: `${item.action} · ${item.humanApprovalState}`, type: "response proposal", surface: "response-proposals" as const, entityId: item.proposalId })),
     );
   }, [data]);
 

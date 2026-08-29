@@ -48,6 +48,7 @@ class RuntimeConfig(BaseModel):
     frontend_origin: str | None = None
     service_environment: str | None = None
     observability_endpoint: str | None = None
+    live_recovery_access_principal_id: str | None = None
 
     @property
     def is_hosted(self) -> bool:
@@ -81,6 +82,7 @@ class RuntimeConfig(BaseModel):
             frontend_origin=os.environ.get("FRONTEND_ORIGIN"),
             service_environment=os.environ.get("SERVICE_ENVIRONMENT"),
             observability_endpoint=os.environ.get("OTEL_EXPORTER_OTLP_ENDPOINT"),
+            live_recovery_access_principal_id=os.environ.get("LIVE_RECOVERY_ACCESS_PRINCIPAL_ID"),
         )
         config.require_hosted_boundaries()
         return config
@@ -136,4 +138,5 @@ class RuntimeConfig(BaseModel):
             "FRONTEND_ORIGIN": self.frontend_origin,
             "SERVICE_ENVIRONMENT": self.service_environment,
             "OTEL_EXPORTER_OTLP_ENDPOINT": self.observability_endpoint,
+            "LIVE_RECOVERY_ACCESS_PRINCIPAL_ID": self.live_recovery_access_principal_id,
         }

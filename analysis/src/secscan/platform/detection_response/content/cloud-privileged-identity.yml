@@ -1,0 +1,20 @@
+title: SecScan privileged cloud identity change
+id: secscan-v03-cloud-privileged-identity
+status: stable
+description: Detects a bounded cloud audit fixture for a privileged identity change.
+author: SecScanMonitor
+references:
+  - https://attack.mitre.org/techniques/T1098/
+tags:
+  - attack.t1098
+logsource:
+  category: cloud
+  product: cloud
+detection:
+  selection:
+    action: CreateAccessKey
+    outcome: success
+  condition: selection
+level: high
+x_secscan_confidence: medium
+x_secscan_rationale: Cloud audit identity changes are scoped to one tenant, case, and target.

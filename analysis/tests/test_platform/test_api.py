@@ -177,3 +177,36 @@ def test_dev_auth_refuses_non_loopback_client_scope() -> None:
 def test_report_endpoint_404_when_absent(client) -> None:
     _create_engagement(client)
     assert client.get("/engagements/ENG-API-1/report", headers=HEADERS).status_code == 404
+
+
+def test_local_v03_projection_is_read_only_and_scope_explicit() -> None:
+    state = AppState(
+        detection_signals={
+            "SIG-LOCAL-1": {
+                "signal_id": "SIG-LOCAL-1",
+                "tenant_id": "tenant-local",
+                "case_id": "case-local",
+                "rule_id": "rule-local",
+                "rule_version": 1,
+                "severity": "HIGH",
+                "confidence": "HIGH",
+                "status": "NEW",
+                "event_ids": ["SE-LOCAL-1"],
+                "evidence_refs": ["metadata://SE-LOCAL-1"],
+                "source": "local qualification",
+            }
+        }
+    )
+    test_client = TestClient(create_app(state, bind_host="127.0.0.1"))
+
+    for path in ("/detection/signals", "/hunts", "/incidents", "/response-proposals"):
+        response = test_client.get(path, headers=HEADERS)
+        assert response.status_code == 200, response.text
+        assert "items" in response.json()
+    snapshot = test_client.get("/experience", headers=HEADERS)
+    assert snapshot.status_code == 200
+    body = snapshot.json()
+    assert body["detectionSignals"][0]["signalId"] == "SIG-LOCAL-1"
+    assert body["detectionSignals"][0]["scope"] == {"tenantId": "tenant-local", "caseId": "case-local"}
+    assert body["incidents"] == []
+    assert body["responseProposals"] == []

@@ -1,4 +1,12 @@
-import type { DataMode as ExperienceDataMode, GraphEdgeView, GraphNodeView } from "../../../../packages/secscan-experience-contracts/src/index";
+import type {
+  DataMode as ExperienceDataMode,
+  ExperienceDetectionSignalView,
+  ExperienceHuntView,
+  ExperienceIncidentView,
+  ExperienceResponseProposalView,
+  GraphEdgeView,
+  GraphNodeView,
+} from "../../../../packages/secscan-experience-contracts/src/index";
 
 export type DataMode = ExperienceDataMode;
 
@@ -169,6 +177,11 @@ export type AuditEventView = {
   origin: "API" | "SYNTHETIC";
 };
 
+export type DetectionSignalView = ExperienceDetectionSignalView & { origin?: "API" | "SYNTHETIC" };
+export type HuntView = ExperienceHuntView & { origin?: "API" | "SYNTHETIC" };
+export type IncidentView = ExperienceIncidentView & { origin?: "API" | "SYNTHETIC" };
+export type ResponseProposalView = ExperienceResponseProposalView & { origin?: "API" | "SYNTHETIC" };
+
 export type PreviewData = {
   mode: DataMode;
   originLabel: string;
@@ -185,4 +198,8 @@ export type PreviewData = {
   audit: AuditEventView[];
   graphNodes: GraphNodeView[];
   graphEdges: GraphEdgeView[];
+  detectionSignals?: DetectionSignalView[];
+  hunts?: HuntView[];
+  incidents?: IncidentView[];
+  responseProposals?: ResponseProposalView[];
 };

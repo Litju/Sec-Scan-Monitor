@@ -7,10 +7,10 @@ export const previewData: PreviewData = {
   originLabel: "SYNTHETIC / NON-PERSONAL / NON-CLIENT / QUALIFICATION_ONLY",
   engagements: [
     {
-      engagementId: "ENG-PUBLIC-015",
-      clientId: "CLI-SYNTHETIC",
-      clientName: "Synthetic Client",
-      targetIds: ["TGT-SYNTHETIC-SNAPSHOT"],
+      engagementId: "ENG-2026-015",
+      clientId: "CLI-VPP",
+      clientName: "Synthetic agent client",
+      targetIds: ["TGT-VPP-SNAPSHOT"],
       targetLabel: "immutable repository snapshot",
       snapshotLabel: "digest-bound · qualification artifact",
       scope: "Immutable snapshot inspection and bounded cross-layer review.",
@@ -23,7 +23,7 @@ export const previewData: PreviewData = {
       origin,
     },
     {
-      engagementId: "ENG-PUBLIC-022",
+      engagementId: "ENG-2026-022",
       clientId: "CLI-AGENT",
       clientName: "Agent Systems Lab",
       targetIds: ["TGT-AGENT-SNAPSHOT"],
@@ -42,7 +42,7 @@ export const previewData: PreviewData = {
   findings: [
     {
       findingId: "FND-PREV-015",
-      engagementId: "ENG-PUBLIC-015",
+      engagementId: "ENG-2026-015",
       severity: "Low",
       summary: "A review capability reported unavailable advisory data under its network-none policy.",
       impact: "The affected capability is not qualified for this snapshot; no unsupported conclusion is issued.",
@@ -59,9 +59,9 @@ export const previewData: PreviewData = {
   evidence: [
     {
       evidenceId: "E-1181",
-      engagementId: "ENG-PUBLIC-015",
-      targetId: "TGT-SYNTHETIC-SNAPSHOT",
-      targetSnapshot: "Synthetic Client · immutable snapshot",
+      engagementId: "ENG-2026-015",
+      targetId: "TGT-VPP-SNAPSHOT",
+      targetSnapshot: "Synthetic agent client · immutable snapshot",
       collector: "Security Review Specialist V1",
       toolVersion: "deterministic-fake-v1",
       capabilityId: "CAP-ADVISORY-READ",
@@ -79,7 +79,7 @@ export const previewData: PreviewData = {
   runs: [
     {
       agentRunId: "AR-015-COORD-01",
-      engagementId: "ENG-PUBLIC-015",
+      engagementId: "ENG-2026-015",
       agentId: "agent.security-review-v1",
       agentRole: "Security Review Specialist",
       agentVersion: "1.0.0",
@@ -123,10 +123,10 @@ export const previewData: PreviewData = {
   approvals: [
     {
       approvalId: "APR-015-004",
-      engagementId: "ENG-PUBLIC-015",
+      engagementId: "ENG-2026-015",
       requestedBy: "agent.security-review-v1",
       requestRef: "CAP-ADVISORY-015-004",
-      targetId: "TGT-SYNTHETIC-SNAPSHOT",
+      targetId: "TGT-VPP-SNAPSHOT",
       capabilityId: "CAP-ADVISORY-READ",
       action: "inspect",
       risk: "medium",
@@ -137,17 +137,17 @@ export const previewData: PreviewData = {
     },
   ],
   clients: [
-    { clientId: "CLI-SYNTHETIC", name: "Synthetic Client", targetCount: 1, engagementCount: 1, status: "closed qualification", origin },
+    { clientId: "CLI-VPP", name: "Synthetic agent client", targetCount: 1, engagementCount: 1, status: "closed qualification", origin },
     { clientId: "CLI-AGENT", name: "Agent Systems Lab", targetCount: 1, engagementCount: 1, status: "active qualification", origin },
   ],
   targets: [
-    { targetId: "TGT-SYNTHETIC-SNAPSHOT", clientId: "CLI-SYNTHETIC", name: "Synthetic Client snapshot", kind: "repository", snapshot: "immutable snapshot", snapshotDigest: "sha256: f364…43b1", liveCheckout: "separate", origin },
+    { targetId: "TGT-VPP-SNAPSHOT", clientId: "CLI-VPP", name: "Synthetic agent client snapshot", kind: "repository", snapshot: "immutable snapshot", snapshotDigest: "sha256: f364…43b1", liveCheckout: "separate", origin },
     { targetId: "TGT-AGENT-SNAPSHOT", clientId: "CLI-AGENT", name: "agent repository snapshot", kind: "repository", snapshot: "qualification-only", snapshotDigest: "sha256: synthetic", liveCheckout: "unknown", origin },
   ],
   reports: [
     {
-      engagementId: "ENG-PUBLIC-015",
-      title: "ENG-PUBLIC-015 · Posture assessment",
+      engagementId: "ENG-2026-015",
+      title: "ENG-2026-015 · Posture assessment",
       verdict: "PASS_WITH_LIMITATIONS",
       scope: "Synthetic repository qualification only.",
       generatedAt: "2026-08-15T18:40:00Z",
@@ -159,16 +159,79 @@ export const previewData: PreviewData = {
       origin,
     },
   ],
+  detectionSignals: [
+    {
+      id: "SIG-PREV-022-001",
+      signalId: "SIG-PREV-022-001",
+      caseId: "ENG-2026-022",
+      ruleId: "secscan.endpoint.privilege-escalation",
+      ruleVersion: 1,
+      severity: "High",
+      confidence: "High",
+      state: "NEW",
+      eventIds: ["EVT-PREV-ENDPOINT-001", "EVT-PREV-ENDPOINT-002"],
+      evidenceRefs: ["EV-PREV-022-001"],
+      scope: { tenantId: "tenant-preview", caseId: "ENG-2026-022" },
+      source: "synthetic detection qualification",
+      origin,
+    },
+  ],
+  hunts: [
+    {
+      id: "HUNT-PREV-022-001",
+      huntId: "HUNT-PREV-022-001",
+      hypothesisId: "HYP-PREV-022-001",
+      caseId: "ENG-2026-022",
+      disposition: "VERIFIED",
+      state: "VERIFIED",
+      evidenceRefs: ["EV-PREV-022-001", "EV-PREV-022-002"],
+      scope: { tenantId: "tenant-preview", caseId: "ENG-2026-022" },
+      source: "synthetic threat-hunt qualification",
+      origin,
+    },
+  ],
+  incidents: [
+    {
+      id: "INC-PREV-022-001",
+      incidentId: "INC-PREV-022-001",
+      caseId: "ENG-2026-022",
+      state: "CONFIRMED",
+      severity: "High",
+      confidence: "High",
+      signalIds: ["SIG-PREV-022-001"],
+      evidenceRefs: ["EV-PREV-022-001", "EV-PREV-022-002"],
+      scope: { tenantId: "tenant-preview", caseId: "ENG-2026-022" },
+      provenance: { source: "synthetic incident adjudication", sourceType: "qualification", observedAt: "2026-08-16T10:20:00Z", evidenceRefs: ["EV-PREV-022-001", "EV-PREV-022-002"], status: "CONFIRMED" },
+      origin,
+    },
+  ],
+  responseProposals: [
+    {
+      id: "RSP-PREV-022-001",
+      proposalId: "RSP-PREV-022-001",
+      incidentId: "INC-PREV-022-001",
+      caseId: "ENG-2026-022",
+      targetId: "TGT-AGENT-SNAPSHOT",
+      action: "isolate_target",
+      opaDecision: "APPROVAL_REQUIRED",
+      humanApprovalState: "APPROVAL_REQUIRED",
+      state: "APPROVAL_REQUIRED",
+      evidenceRefs: ["EV-PREV-022-001", "EV-PREV-022-002"],
+      scope: { tenantId: "tenant-preview", caseId: "ENG-2026-022" },
+      source: "synthetic response proposal qualification",
+      origin,
+    },
+  ],
   audit: [
-    { auditEventId: "AUD-015-17", engagementId: "ENG-PUBLIC-015", principalId: "operator-local", kind: "policy_decision", summary: "CAP-ADVISORY-READ evaluated within inspection-only scope.", occurredAt: "2026-08-15T17:43:00Z", relatedIds: ["AR-015-COORD-01"], origin },
+    { auditEventId: "AUD-015-17", engagementId: "ENG-2026-015", principalId: "operator-local", kind: "policy_decision", summary: "CAP-ADVISORY-READ evaluated within inspection-only scope.", occurredAt: "2026-08-15T17:43:00Z", relatedIds: ["AR-015-COORD-01"], origin },
   ],
   graphNodes: [
-    { id: "node-snapshot", kind: "snapshot", label: "immutable repository snapshot", state: "VERIFIED", relatedIds: ["FND-PREV-015"], scope: { tenantId: "tenant-preview", caseId: "ENG-PUBLIC-015" }, provenance: { source: "snapshot registry", sourceType: "preview", observedAt: "2026-08-15T18:40:00Z", evidenceRefs: ["E-1181"], status: "VERIFIED" } },
-    { id: "node-finding", kind: "finding", label: "Advisory data is unavailable for the review capability.", state: "INCONCLUSIVE", relatedIds: ["FND-PREV-015"], scope: { tenantId: "tenant-preview", caseId: "ENG-PUBLIC-015" }, provenance: { source: "patrol projection", sourceType: "preview", observedAt: "2026-08-15T18:40:00Z", evidenceRefs: ["E-1181"], status: "INCONCLUSIVE" } },
-    { id: "node-capability", kind: "capability", label: "CAP-ADVISORY-READ", state: "APPROVAL_REQUIRED", relatedIds: ["FND-PREV-015"], scope: { tenantId: "tenant-preview", caseId: "ENG-PUBLIC-015" }, provenance: { source: "capability registry", sourceType: "preview", observedAt: "2026-08-15T17:43:00Z", evidenceRefs: [], status: "APPROVAL_REQUIRED" } },
+    { id: "node-snapshot", kind: "snapshot", label: "immutable repository snapshot", state: "VERIFIED", relatedIds: ["FND-PREV-015"], scope: { tenantId: "tenant-preview", caseId: "ENG-2026-015" }, provenance: { source: "snapshot registry", sourceType: "preview", observedAt: "2026-08-15T18:40:00Z", evidenceRefs: ["E-1181"], status: "VERIFIED" } },
+    { id: "node-finding", kind: "finding", label: "Advisory data is unavailable for the review capability.", state: "INCONCLUSIVE", relatedIds: ["FND-PREV-015"], scope: { tenantId: "tenant-preview", caseId: "ENG-2026-015" }, provenance: { source: "patrol projection", sourceType: "preview", observedAt: "2026-08-15T18:40:00Z", evidenceRefs: ["E-1181"], status: "INCONCLUSIVE" } },
+    { id: "node-capability", kind: "capability", label: "CAP-ADVISORY-READ", state: "APPROVAL_REQUIRED", relatedIds: ["FND-PREV-015"], scope: { tenantId: "tenant-preview", caseId: "ENG-2026-015" }, provenance: { source: "capability registry", sourceType: "preview", observedAt: "2026-08-15T17:43:00Z", evidenceRefs: [], status: "APPROVAL_REQUIRED" } },
   ],
   graphEdges: [
-    { id: "edge-snapshot-finding", sourceId: "node-snapshot", targetId: "node-finding", relation: "supports", state: "VERIFIED", relatedIds: ["FND-PREV-015"], scope: { tenantId: "tenant-preview", caseId: "ENG-PUBLIC-015" }, provenance: { source: "evidence linkage", sourceType: "preview", observedAt: "2026-08-15T18:40:00Z", evidenceRefs: ["E-1181"], status: "VERIFIED" } },
-    { id: "edge-finding-capability", sourceId: "node-finding", targetId: "node-capability", relation: "depends on", state: "INCONCLUSIVE", relatedIds: ["FND-PREV-015"], scope: { tenantId: "tenant-preview", caseId: "ENG-PUBLIC-015" }, provenance: { source: "patrol projection", sourceType: "preview", observedAt: "2026-08-15T18:40:00Z", evidenceRefs: ["E-1181"], status: "INCONCLUSIVE" } },
+    { id: "edge-snapshot-finding", sourceId: "node-snapshot", targetId: "node-finding", relation: "supports", state: "VERIFIED", relatedIds: ["FND-PREV-015"], scope: { tenantId: "tenant-preview", caseId: "ENG-2026-015" }, provenance: { source: "evidence linkage", sourceType: "preview", observedAt: "2026-08-15T18:40:00Z", evidenceRefs: ["E-1181"], status: "VERIFIED" } },
+    { id: "edge-finding-capability", sourceId: "node-finding", targetId: "node-capability", relation: "depends on", state: "INCONCLUSIVE", relatedIds: ["FND-PREV-015"], scope: { tenantId: "tenant-preview", caseId: "ENG-2026-015" }, provenance: { source: "patrol projection", sourceType: "preview", observedAt: "2026-08-15T18:40:00Z", evidenceRefs: ["E-1181"], status: "INCONCLUSIVE" } },
   ],
 };

@@ -14,6 +14,10 @@ export type SurfaceKey =
   | "skills"
   | "runtime"
   | "assistant"
+  | "signals"
+  | "hunts"
+  | "incidents"
+  | "response-proposals"
   | "command-center"
   | "engagements";
 
@@ -41,6 +45,10 @@ export const settingsRoutes: readonly RouteDefinition[] = [
 
 export const expertRoutes: readonly RouteDefinition[] = [
   { key: "findings", label: "Findings", eyebrow: "Adjudication", description: "Inspect adjudicated conclusions and their evidence chain.", group: "expert", pigment: "orpiment-cinnabar" },
+  { key: "signals", label: "Signals", eyebrow: "Detection attention", description: "Inspect bounded detector output before it becomes a finding or incident.", group: "expert", pigment: "cinnabar-orpiment" },
+  { key: "hunts", label: "Hunts", eyebrow: "Threat hunting", description: "Inspect scoped hypotheses and evidence gathered to test them.", group: "expert", pigment: "tyrian-verdigris" },
+  { key: "incidents", label: "Incidents", eyebrow: "Incident adjudication", description: "Inspect confirmed incidents and the evidence that supports the decision.", group: "expert", pigment: "cinnabar-prussian" },
+  { key: "response-proposals", label: "Response Proposals", eyebrow: "Advisory response", description: "Inspect proposed response, policy decision, and required human approval.", group: "expert", pigment: "orpiment-prussian" },
   { key: "evidence", label: "Evidence", eyebrow: "Chain of custody", description: "Inspect safe metadata without retrieving raw evidence in the browser.", group: "expert", pigment: "verdigris-lapis" },
   { key: "runs", label: "Activity", eyebrow: "Execution record", description: "Review bounded activity without treating an agent as authority.", group: "expert", pigment: "tyrian-prussian" },
   { key: "capabilities", label: "Tools", eyebrow: "Execution trust", description: "Follow registered tools, permissions, sandbox, and evidence boundaries.", group: "expert", pigment: "prussian-quartz" },

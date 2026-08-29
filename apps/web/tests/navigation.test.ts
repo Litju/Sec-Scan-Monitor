@@ -5,7 +5,7 @@ describe("product route map", () => {
   it("keeps the simplified primary IA and expert routes in one map", () => {
     expect(primaryRoutes.map((route) => route.key)).toEqual(["today", "cases", "clients", "reports"]);
     expect(surfaceRoutes.map((route) => route.key)).toEqual(expect.arrayContaining([
-      "today", "cases", "clients", "reports", "settings", "findings", "evidence", "runs", "capabilities", "approvals", "governance", "audit", "skills", "runtime", "assistant", "command-center", "engagements",
+      "today", "cases", "clients", "reports", "settings", "findings", "signals", "hunts", "incidents", "response-proposals", "evidence", "runs", "capabilities", "approvals", "governance", "audit", "skills", "runtime", "assistant", "command-center", "engagements",
     ]));
   });
 
@@ -13,7 +13,12 @@ describe("product route map", () => {
     expect(pathForSurface("today")).toBe("/");
     expect(pathForSurface("command-center")).toBe("/");
     expect(normalizeSurface("engagements")).toBe("cases");
-    expect(pathForSurface("engagements", "ENG-PUBLIC-021")).toBe("/engagements/ENG-PUBLIC-021");
-    expect(pathForSurface("cases", "ENG-PUBLIC-021")).toBe("/cases/ENG-PUBLIC-021");
+    expect(pathForSurface("engagements", "ENG-2026-021")).toBe("/engagements/ENG-2026-021");
+    expect(pathForSurface("cases", "ENG-2026-021")).toBe("/cases/ENG-2026-021");
+  });
+
+  it("keeps detection and response routes contextual rather than primary", () => {
+    expect(primaryRoutes.map((route) => route.key)).not.toEqual(expect.arrayContaining(["signals", "hunts", "incidents", "response-proposals"]));
+    expect(pathForSurface("response-proposals", "RSP-1")).toBe("/response-proposals/RSP-1");
   });
 });

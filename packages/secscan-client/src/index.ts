@@ -23,6 +23,7 @@ type CanonicalClientOptions = {
   baseUrl?: string;
   fetchImpl?: typeof fetch;
   getAuthorization?: (endpoint: string) => Promise<string>;
+  principal?: string;
 };
 
 function joinUrl(baseUrl: string, endpoint: string): string {
@@ -33,12 +34,13 @@ function joinUrl(baseUrl: string, endpoint: string): string {
   return `${baseUrl.slice(0, baseEnd)}/${endpoint.slice(endpointStart)}`;
 }
 
-export function createCanonicalClient({ mode, baseUrl = "/api/secscan", fetchImpl = fetch, getAuthorization }: CanonicalClientOptions) {
+export function createCanonicalClient({ mode, baseUrl = "/api/secscan", fetchImpl = fetch, getAuthorization, principal }: CanonicalClientOptions) {
   async function request<T>(endpoint: string, init: RequestInit = {}): Promise<T> {
     if (mode === "PREVIEW") throw new PreviewReadOnlyError(`${init.method ?? "GET"} ${endpoint}`);
     const headers: Record<string, string> = { Accept: "application/json" };
     if (init.body !== undefined) headers["Content-Type"] = "application/json";
     if (getAuthorization) headers.Authorization = await getAuthorization(endpoint);
+    if (principal?.trim()) headers["X-Secscan-Principal"] = principal.trim();
     const response = await fetchImpl(joinUrl(baseUrl, endpoint), { ...init, headers, cache: "no-store" });
     if (!response.ok) throw new ApiError(`SecScanMonitor API returned ${response.status}.`, response.status, endpoint);
     return (await response.json()) as T;

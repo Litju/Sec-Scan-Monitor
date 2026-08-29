@@ -39,14 +39,19 @@ from secscan.platform.read_models import (
     AuditEventReadModel,
     ClientReadModel,
     CursorPage,
+    DetectionSignalReadModel,
     EngagementReadModel,
     EvidenceMetadataReadModel,
     FindingReadModel,
     FirmSummaryReadModel,
+    HuntReadModel,
+    IncidentReadModel,
     ReadModelError,
+    ResponseProposalReadModel,
     TargetReadModel,
     _decode_cursor,
     _encode_cursor,
+    compose_experience_snapshot,
 )
 
 T = TypeVar("T")
@@ -257,6 +262,40 @@ class PostgresReadModelService:
             }
         return FirmSummaryReadModel(**counts, data_mode="HOSTED_INTEGRATED")
 
+    def experience(self, *, identity: VerifiedHumanIdentity) -> dict[str, Any]:
+        """Return one bounded, scope-filtered snapshot for the operator console."""
+        clients_page = self.list_clients(identity=identity, limit=100)
+        targets_page = self.list_targets(identity=identity, limit=100)
+        cases_page = self.list_engagements(identity=identity, limit=100)
+        findings_page = self.list_findings(identity=identity, limit=100)
+        evidence_page = self.list_evidence(identity=identity, limit=100)
+        audit_page = self.list_audit(identity=identity, limit=100)
+        signals_page = self.list_detection_signals(identity=identity, limit=100)
+        hunts_page = self.list_hunts(identity=identity, limit=100)
+        incidents_page = self.list_incidents(identity=identity, limit=100)
+        proposals_page = self.list_response_proposals(identity=identity, limit=100)
+        return compose_experience_snapshot(
+            mode="HOSTED_INTEGRATED",
+            source_label="HOSTED / AUTHENTICATED / CANONICAL_POSTGRESQL",
+            cases=cases_page.items,
+            findings=findings_page.items,
+            evidence_count_by_case={
+                case.engagement_id: sum(1 for item in evidence_page.items if item.engagement_id == case.engagement_id)
+                for case in cases_page.items
+            },
+            activity_count_by_case={
+                case.engagement_id: sum(1 for item in audit_page.items if item.engagement_id == case.engagement_id)
+                for case in cases_page.items
+            },
+            audit=audit_page.items,
+            clients={item.client_id: item.name for item in clients_page.items},
+            targets={item.target_id: item.name for item in targets_page.items},
+            detection_signals=signals_page.items,
+            hunts=hunts_page.items,
+            incidents=incidents_page.items,
+            response_proposals=proposals_page.items,
+        )
+
     def list_clients(
         self, *, identity: VerifiedHumanIdentity, cursor: str | None = None, limit: int = 50
     ) -> CursorPage[ClientReadModel]:
@@ -434,6 +473,141 @@ class PostgresReadModelService:
                 kind=row.kind,
                 summary=row.summary,
                 occurred_at=row.occurred_at.isoformat(),
+            )
+            for row in rows
+        ]
+        return _read_page(items, offset=offset, limit=limit)
+
+    def list_detection_signals(
+        self, *, identity: VerifiedHumanIdentity, cursor: str | None = None, limit: int = 50
+    ) -> CursorPage[DetectionSignalReadModel]:
+        offset, fetch = _read_window(cursor, limit)
+        stmt = (
+            select(models.DetectionSignalRow)
+            .join(models.EngagementRow, models.EngagementRow.engagement_id == models.DetectionSignalRow.case_id)
+        )
+        with self._session_factory() as session, human_context(session, identity.human_principal_id):
+            scope = self._client_scope(session, identity)
+            if scope is not None:
+                stmt = stmt.where(models.EngagementRow.client_id.in_(scope))
+            rows = list(session.scalars(stmt.order_by(models.DetectionSignalRow.signal_id).offset(offset).limit(fetch)))
+        items = [
+            DetectionSignalReadModel(
+                signal_id=row.signal_id,
+                tenant_id=row.tenant_id,
+                case_id=row.case_id,
+                rule_id=row.rule_id,
+                rule_version=row.rule_version,
+                severity=row.severity,
+                confidence=row.confidence,
+                status=row.status,
+                event_ids=list(row.event_ids or []),
+                evidence_refs=list(row.raw_evidence_refs or []),
+                source="canonical detection engine",
+            )
+            for row in rows
+        ]
+        return _read_page(items, offset=offset, limit=limit)
+
+    def list_hunts(
+        self, *, identity: VerifiedHumanIdentity, cursor: str | None = None, limit: int = 50
+    ) -> CursorPage[HuntReadModel]:
+        offset, fetch = _read_window(cursor, limit)
+        stmt = (
+            select(models.HuntExecutionRow)
+            .join(models.EngagementRow, models.EngagementRow.engagement_id == models.HuntExecutionRow.case_id)
+        )
+        with self._session_factory() as session, human_context(session, identity.human_principal_id):
+            scope = self._client_scope(session, identity)
+            if scope is not None:
+                stmt = stmt.where(models.EngagementRow.client_id.in_(scope))
+            rows = list(session.scalars(stmt.order_by(models.HuntExecutionRow.execution_id).offset(offset).limit(fetch)))
+        values: list[HuntReadModel] = []
+        for row in rows:
+            result = row.result or {}
+            disposition = str(result.get("disposition", "INCONCLUSIVE"))
+            status = "VERIFIED" if disposition == "SUPPORTS" else "CONTRADICTED" if disposition == "REFUTES" else "INCONCLUSIVE"
+            evidence_refs = (
+                result.get("supporting_evidence_refs", [])
+                if disposition == "SUPPORTS"
+                else result.get("refuting_evidence_refs", [])
+                if disposition == "REFUTES"
+                else [
+                    *result.get("supporting_evidence_refs", []),
+                    *result.get("refuting_evidence_refs", []),
+                ]
+            )
+            values.append(
+                HuntReadModel(
+                    hunt_id=row.execution_id,
+                    hypothesis_id=row.hypothesis_id,
+                    tenant_id=row.tenant_id,
+                    case_id=row.case_id,
+                    disposition=disposition,
+                    status=status,
+                    evidence_refs=[str(item) for item in evidence_refs],
+                    source="canonical threat-hunt engine",
+                )
+            )
+        return _read_page(values, offset=offset, limit=limit)
+
+    def list_incidents(
+        self, *, identity: VerifiedHumanIdentity, cursor: str | None = None, limit: int = 50
+    ) -> CursorPage[IncidentReadModel]:
+        offset, fetch = _read_window(cursor, limit)
+        stmt = (
+            select(models.IncidentRow)
+            .join(models.EngagementRow, models.EngagementRow.engagement_id == models.IncidentRow.case_id)
+        )
+        with self._session_factory() as session, human_context(session, identity.human_principal_id):
+            scope = self._client_scope(session, identity)
+            if scope is not None:
+                stmt = stmt.where(models.EngagementRow.client_id.in_(scope))
+            rows = list(session.scalars(stmt.order_by(models.IncidentRow.incident_id).offset(offset).limit(fetch)))
+        items = [
+            IncidentReadModel(
+                incident_id=row.incident_id,
+                tenant_id=row.tenant_id,
+                case_id=row.case_id,
+                status=row.state,
+                severity=row.severity,
+                confidence=row.confidence,
+                signal_ids=list(row.source_signal_ids or []),
+                evidence_refs=list(row.supporting_evidence_refs or []),
+                provenance_source="canonical incident adjudication",
+                provenance_source_type="postgresql",
+                adjudicated_at=row.adjudicated_at.isoformat(),
+            )
+            for row in rows
+        ]
+        return _read_page(items, offset=offset, limit=limit)
+
+    def list_response_proposals(
+        self, *, identity: VerifiedHumanIdentity, cursor: str | None = None, limit: int = 50
+    ) -> CursorPage[ResponseProposalReadModel]:
+        offset, fetch = _read_window(cursor, limit)
+        stmt = (
+            select(models.ResponseProposalRow)
+            .join(models.EngagementRow, models.EngagementRow.engagement_id == models.ResponseProposalRow.case_id)
+        )
+        with self._session_factory() as session, human_context(session, identity.human_principal_id):
+            scope = self._client_scope(session, identity)
+            if scope is not None:
+                stmt = stmt.where(models.EngagementRow.client_id.in_(scope))
+            rows = list(session.scalars(stmt.order_by(models.ResponseProposalRow.proposal_id).offset(offset).limit(fetch)))
+        items = [
+            ResponseProposalReadModel(
+                proposal_id=row.proposal_id,
+                incident_id=row.incident_id,
+                tenant_id=row.tenant_id,
+                case_id=row.case_id,
+                target_id=row.target_id,
+                action=row.action,
+                opa_decision=row.opa_decision,
+                human_approval_state=row.human_approval_state,
+                status=row.human_approval_state,
+                evidence_refs=list(row.supporting_evidence_refs or []),
+                source="canonical response proposal service",
             )
             for row in rows
         ]

@@ -60,7 +60,8 @@ def _npm_components(lock_path: Path) -> list[dict[str, Any]]:
 
 def build_bom(repo_root: Path) -> dict[str, Any]:
     components = _python_components(repo_root / "analysis" / "requirements.lock")
-    components.extend(_npm_components(repo_root / "apps" / "web" / "package-lock.json"))
+    for app in ("web", "tui"):
+        components.extend(_npm_components(repo_root / "apps" / app / "package-lock.json"))
     components.sort(key=lambda item: (item["type"], item["name"].casefold(), item["version"], item["purl"]))
     identity = "\n".join(item["purl"] for item in components).encode("utf-8")
     digest = hashlib.sha256(identity).hexdigest()
@@ -74,9 +75,9 @@ def build_bom(repo_root: Path) -> dict[str, Any]:
             "component": {
                 "type": "application",
                 "name": "SecScanMonitor",
-                "version": "public-foundation-v1",
+                "version": "0.3.0",
             },
-            "tools": [{"vendor": "SecScanMonitor", "name": "build_sbom.py", "version": "0.1.0"}],
+            "tools": [{"vendor": "SecScanMonitor", "name": "build_sbom.py", "version": "0.2.0"}],
         },
         "components": components,
     }
@@ -88,9 +89,8 @@ def main() -> int:
     parser.add_argument("--output", type=Path, required=True)
     args = parser.parse_args()
     root = args.root.resolve()
-    if not (root / "analysis" / "requirements.lock").is_file() or not (
-        root / "apps" / "web" / "package-lock.json"
-    ).is_file():
+    lockfiles = [root / "analysis" / "requirements.lock", *(root / "apps" / app / "package-lock.json" for app in ("web", "tui"))]
+    if not all(path.is_file() for path in lockfiles):
         raise SystemExit("repository root is missing the committed lockfiles")
     output = args.output if args.output.is_absolute() else root / args.output
     output.parent.mkdir(parents=True, exist_ok=True)

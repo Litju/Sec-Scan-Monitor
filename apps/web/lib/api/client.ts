@@ -3,14 +3,20 @@ import type {
   AgentRunView,
   CapabilityView,
   DataMode,
+  DetectionSignalView,
   EngagementView,
   EvidenceView,
   FindingView,
   HealthState,
+  HuntView,
+  IncidentView,
   PreviewData,
   ReportView,
+  ResponseProposalView,
 } from "@/lib/domain/types";
+import type { ExperienceStatus } from "../../../../packages/secscan-experience-contracts/src/index";
 import { ApiError, createCanonicalClient } from "@secscanmonitor/client";
+import { EXPERIENCE_STATUSES } from "../../../../packages/secscan-experience-contracts/src/index";
 
 export { ApiError, PreviewReadOnlyError } from "@secscanmonitor/client";
 
@@ -88,6 +94,73 @@ type HostedReport = {
   generated_at: string;
   no_secrets_asserted: boolean;
 };
+type HostedDetectionSignal = {
+  signal_id: string;
+  tenant_id: string;
+  case_id: string;
+  rule_id: string;
+  rule_version: number;
+  severity: string;
+  confidence: string;
+  status: string;
+  event_ids: string[];
+  evidence_refs: string[];
+  source: string;
+};
+type HostedHunt = {
+  hunt_id: string;
+  hypothesis_id: string;
+  tenant_id: string;
+  case_id: string;
+  disposition: string;
+  status: string;
+  evidence_refs: string[];
+  source: string;
+};
+type HostedIncident = {
+  incident_id: string;
+  tenant_id: string;
+  case_id: string;
+  status: string;
+  severity: string;
+  confidence: string;
+  signal_ids: string[];
+  evidence_refs: string[];
+  provenance_source: string;
+  provenance_source_type: string;
+  adjudicated_at: string;
+};
+type HostedResponseProposal = {
+  proposal_id: string;
+  incident_id: string;
+  tenant_id: string;
+  case_id: string;
+  target_id: string;
+  action: string;
+  opa_decision: string;
+  human_approval_state: string;
+  status: string;
+  evidence_refs: string[];
+  source: string;
+};
+
+function mapExperienceStatus(value: string | undefined, fallback: ExperienceStatus = "UNKNOWN"): ExperienceStatus {
+  const normalized = (value ?? "").toUpperCase();
+  const mapped = {
+    SUPPORTS: "VERIFIED",
+    REFUTES: "CONTRADICTED",
+    REQUIRE_APPROVAL: "APPROVAL_REQUIRED",
+    ALLOW: "VERIFIED",
+    DENY: "DENIED",
+    CONTAINED: "CONFIRMED",
+    RECOVERING: "CONFIRMED",
+    OPEN: "NEW",
+    CLOSED: "RESOLVED",
+    REFUSED: "DENIED",
+    REVOKED: "DENIED",
+  }[normalized] ?? normalized;
+  return EXPERIENCE_STATUSES.includes(mapped as ExperienceStatus) ? mapped as ExperienceStatus : fallback;
+}
 
 let hostedAuthClient: Promise<{ getJWTToken: () => Promise<string | null> }> | undefined;
 
@@ -151,6 +224,10 @@ export function createApiClient(mode: DataMode = resolveApiMode()) {
     getServices: () => get<HostedService[]>("/services"),
     getAudit: () => get<HostedPage<HostedAudit>>("/audit"),
     getApprovals: () => get<HostedPage<HostedApproval>>("/approvals"),
+    getDetectionSignals: () => get<HostedPage<HostedDetectionSignal>>("/detection/signals"),
+    getHunts: () => get<HostedPage<HostedHunt>>("/hunts"),
+    getIncidents: () => get<HostedPage<HostedIncident>>("/incidents"),
+    getResponseProposals: () => get<HostedPage<HostedResponseProposal>>("/response-proposals"),
     createEngagement: (payload: {
       engagement_id: string;
       client_id: string;
@@ -174,13 +251,17 @@ export function createApiClient(mode: DataMode = resolveApiMode()) {
 
 export async function loadHostedData(mode: DataMode = "HOSTED_INTEGRATED"): Promise<PreviewData> {
   const api = createApiClient(mode);
-  const [clientsPage, targetsPage, engagementsPage, findingsPage, evidencePage, auditPage] = await Promise.all([
+  const [clientsPage, targetsPage, engagementsPage, findingsPage, evidencePage, auditPage, detectionSignalsPage, huntsPage, incidentsPage, responseProposalsPage] = await Promise.all([
     api.getClients(),
     api.getTargets(),
     api.getEngagements(),
     api.getFindingsPage(),
     api.getEvidencePage(),
     api.getAudit(),
+    api.getDetectionSignals(),
+    api.getHunts(),
+    api.getIncidents(),
+    api.getResponseProposals(),
   ]);
   const approvalsPage = mode === "LOCAL_INTEGRATED" ? await api.getApprovals() : { items: [] as HostedApproval[] };
   const clientNames = new Map(clientsPage.items.map((client) => [client.client_id, client.name]));
@@ -291,6 +372,67 @@ export async function loadHostedData(mode: DataMode = "HOSTED_INTEGRATED"): Prom
       throw error;
     }
   }))).filter((report): report is ReportView => report !== null);
+  const detectionSignals: DetectionSignalView[] = detectionSignalsPage.items.map((signal) => ({
+    id: signal.signal_id,
+    signalId: signal.signal_id,
+    caseId: signal.case_id,
+    ruleId: signal.rule_id,
+    ruleVersion: signal.rule_version,
+    severity: signal.severity,
+    confidence: signal.confidence,
+    state: mapExperienceStatus(signal.status),
+    eventIds: signal.event_ids,
+    evidenceRefs: signal.evidence_refs,
+    scope: { tenantId: signal.tenant_id, caseId: signal.case_id },
+    source: signal.source,
+    origin: "API",
+  }));
+  const hunts: HuntView[] = huntsPage.items.map((hunt) => ({
+    id: hunt.hunt_id,
+    huntId: hunt.hunt_id,
+    hypothesisId: hunt.hypothesis_id,
+    caseId: hunt.case_id,
+    disposition: mapExperienceStatus(hunt.disposition, "INCONCLUSIVE"),
+    state: mapExperienceStatus(hunt.status, "INCONCLUSIVE"),
+    evidenceRefs: hunt.evidence_refs,
+    scope: { tenantId: hunt.tenant_id, caseId: hunt.case_id },
+    source: hunt.source,
+    origin: "API",
+  }));
+  const incidents: IncidentView[] = incidentsPage.items.map((incident) => ({
+    id: incident.incident_id,
+    incidentId: incident.incident_id,
+    caseId: incident.case_id,
+    state: mapExperienceStatus(incident.status),
+    severity: incident.severity,
+    confidence: incident.confidence,
+    signalIds: incident.signal_ids,
+    evidenceRefs: incident.evidence_refs,
+    scope: { tenantId: incident.tenant_id, caseId: incident.case_id },
+    provenance: {
+      source: incident.provenance_source,
+      sourceType: incident.provenance_source_type,
+      observedAt: incident.adjudicated_at,
+      evidenceRefs: incident.evidence_refs,
+      status: mapExperienceStatus(incident.status),
+    },
+    origin: "API",
+  }));
+  const responseProposals: ResponseProposalView[] = responseProposalsPage.items.map((proposal) => ({
+    id: proposal.proposal_id,
+    proposalId: proposal.proposal_id,
+    incidentId: proposal.incident_id,
+    caseId: proposal.case_id,
+    targetId: proposal.target_id,
+    action: proposal.action,
+    opaDecision: mapExperienceStatus(proposal.opa_decision),
+    humanApprovalState: mapExperienceStatus(proposal.human_approval_state),
+    state: mapExperienceStatus(proposal.status),
+    evidenceRefs: proposal.evidence_refs,
+    scope: { tenantId: proposal.tenant_id, caseId: proposal.case_id },
+    source: proposal.source,
+    origin: "API",
+  }));
   return {
     mode,
     originLabel: mode === "LOCAL_INTEGRATED" ? "LOCAL / LOOPBACK / LIVE_QUALIFICATION_CANONICAL" : "HOSTED / AUTHENTICATED / CANONICAL_POSTGRESQL",
@@ -345,5 +487,9 @@ export async function loadHostedData(mode: DataMode = "HOSTED_INTEGRATED"): Prom
     })),
     graphNodes: [],
     graphEdges: [],
+    detectionSignals,
+    hunts,
+    incidents,
+    responseProposals,
   };
 }

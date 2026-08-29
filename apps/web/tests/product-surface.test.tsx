@@ -11,10 +11,20 @@ describe("SecScanMonitor product surface", () => {
   it("renders attention-first Today as a preview-safe surface", () => {
     renderSurface("today");
     expect(screen.getByRole("heading", { name: "Today" })).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "1 things need your attention" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "4 things need your attention" })).toBeInTheDocument();
     expect(screen.getByText("Needs You")).toBeInTheDocument();
     expect(screen.getByText("Preview · read-only")).toBeInTheDocument();
     expect(screen.queryByText("Context stays intact")).not.toBeInTheDocument();
+  });
+
+  it("keeps the detection chain contextual and read-only", async () => {
+    const user = userEvent.setup();
+    renderSurface("signals");
+    expect(screen.getByRole("heading", { name: "Signals" })).toBeInTheDocument();
+    expect(screen.getByText(/not a finding or an incident/i)).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: /SIG-PREV-022-001/ }));
+    expect(screen.getByText(/Signal only; detector output cannot create an incident/i)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /execute/i })).not.toBeInTheDocument();
   });
 
   it("supports keyboard command navigation without mutation commands", async () => {
@@ -24,9 +34,9 @@ describe("SecScanMonitor product surface", () => {
     const palette = screen.getByRole("dialog", { name: "Search and ask" });
     expect(palette).toBeInTheDocument();
     const input = screen.getByRole("combobox", { name: /Search/ });
-    await user.type(input, "ENG-PUBLIC-015");
+    await user.type(input, "ENG-2026-015");
     await user.keyboard("{Enter}");
-    expect(screen.getByRole("heading", { name: "Case ENG-PUBLIC-015" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Case ENG-2026-015" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Overview" })).toBeInTheDocument();
   });
 

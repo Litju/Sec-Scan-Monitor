@@ -28,6 +28,14 @@ jobs:
         uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
         with:
           python-version: "3.12"
+      - name: Install pinned OPA
+        run: |
+          curl --fail --location --silent --show-error \
+            --output /tmp/opa \
+            https://github.com/open-policy-agent/opa/releases/download/v1.19.0/opa_linux_amd64
+          echo "4ae5eeec241c9f5df7c5f566fe96e26336ce186f8c773c46ffdf10b48189a520  /tmp/opa" | sha256sum --check --strict
+          chmod 0755 /tmp/opa
+          echo "/tmp" >> "$GITHUB_PATH"
       - name: Install
         working-directory: analysis
         run: |

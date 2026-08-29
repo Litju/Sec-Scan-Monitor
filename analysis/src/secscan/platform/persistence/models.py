@@ -674,3 +674,339 @@ class ServiceQualificationRow(Base):
     qualification_state: Mapped[str] = mapped_column(String(48), index=True)
     receipt: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
+
+
+class SecurityEventRow(Base):
+    """Canonical normalized security event; raw source content stays external."""
+
+    __tablename__ = "security_events"
+    event_id: Mapped[str] = mapped_column(String(96), primary_key=True)
+    tenant_id: Mapped[str] = mapped_column(String(128), index=True)
+    case_id: Mapped[str] = mapped_column(String(128), index=True)
+    target_id: Mapped[str] = mapped_column(String(128), index=True)
+    source: Mapped[str] = mapped_column(String(128))
+    source_type: Mapped[str] = mapped_column(String(128))
+    source_family: Mapped[str] = mapped_column(String(64), index=True)
+    event_class: Mapped[str] = mapped_column(String(96), index=True)
+    ocsf_class: Mapped[str] = mapped_column(String(96))
+    ocsf_version: Mapped[str] = mapped_column(String(32), default="1.8.0")
+    occurred_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
+    observed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    ingested_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
+    actor: Mapped[str] = mapped_column(String(255))
+    object_ref: Mapped[str] = mapped_column(String(255))
+    action: Mapped[str] = mapped_column(String(255))
+    outcome: Mapped[str] = mapped_column(String(96))
+    severity: Mapped[str | None] = mapped_column(String(16))
+    raw_evidence_ref: Mapped[str] = mapped_column(String(512))
+    source_digest: Mapped[str] = mapped_column(String(128))
+    normalization_version: Mapped[str] = mapped_column(String(64))
+    ordering_metadata: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
+    payload: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
+    fingerprint: Mapped[str] = mapped_column(String(64))
+
+    __table_args__ = (
+        UniqueConstraint("tenant_id", "case_id", "target_id", "fingerprint", name="uq_security_event_scope_fingerprint"),
+        Index("ix_security_events_scope_occurred", "tenant_id", "case_id", "target_id", "occurred_at"),
+    )
+
+
+class DetectionRuleVersionRow(Base):
+    __tablename__ = "detection_rule_versions"
+    rule_id: Mapped[str] = mapped_column(String(128), primary_key=True)
+    version: Mapped[int] = mapped_column(Integer, primary_key=True)
+    title: Mapped[str] = mapped_column(String(255))
+    rule_type: Mapped[str] = mapped_column(String(48))
+    content_digest: Mapped[str] = mapped_column(String(128), index=True)
+    source: Mapped[str] = mapped_column(String(128))
+    source_reference: Mapped[str] = mapped_column(String(512))
+    owner: Mapped[str] = mapped_column(String(64), default="SecScanMonitor", server_default="SecScanMonitor")
+    event_schema: Mapped[str] = mapped_column(String(96))
+    ocsf_version: Mapped[str] = mapped_column(String(32))
+    supported_source_families: Mapped[list[Any]] = mapped_column(JSON, default=list)
+    severity: Mapped[str] = mapped_column(String(16))
+    confidence: Mapped[str] = mapped_column(String(16))
+    confidence_metadata: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
+    attack_mappings: Mapped[list[Any]] = mapped_column(JSON, default=list)
+    atlas_mappings: Mapped[list[Any]] = mapped_column(JSON, default=list)
+    references: Mapped[list[Any]] = mapped_column(JSON, default=list)
+    predicates: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
+    correlation_keys: Mapped[list[Any]] = mapped_column(JSON, default=list)
+    window_seconds: Mapped[int] = mapped_column(Integer, default=0)
+    threshold: Mapped[int] = mapped_column(Integer, default=1)
+    status: Mapped[str] = mapped_column(String(32), index=True)
+    evaluation_metadata: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
+    # Digest of the complete normalized rule record.  ``content_digest`` is
+    # the source/Sigma digest; this second digest detects a database row that
+    # was altered after registration without changing its source digest.
+    canonical_digest: Mapped[str | None] = mapped_column(String(128), index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
+    modified_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
+
+
+class DetectionPlanRow(Base):
+    __tablename__ = "detection_plans"
+    plan_id: Mapped[str] = mapped_column(String(128), primary_key=True)
+    rule_id: Mapped[str] = mapped_column(String(128), index=True)
+    rule_version: Mapped[int] = mapped_column(Integer)
+    rule_type: Mapped[str] = mapped_column(String(48))
+    content_digest: Mapped[str] = mapped_column(String(128))
+    event_schema: Mapped[str] = mapped_column(String(96))
+    supported_source_families: Mapped[list[Any]] = mapped_column(JSON, default=list)
+    predicates: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
+    correlation_keys: Mapped[list[Any]] = mapped_column(JSON, default=list)
+    window_seconds: Mapped[int] = mapped_column(Integer, default=0)
+    threshold: Mapped[int] = mapped_column(Integer, default=1)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
+
+
+class DetectionRunRow(Base):
+    __tablename__ = "detection_runs"
+    run_id: Mapped[str] = mapped_column(String(128), primary_key=True)
+    tenant_id: Mapped[str] = mapped_column(String(128), index=True)
+    case_id: Mapped[str] = mapped_column(String(128), index=True)
+    target_id: Mapped[str] = mapped_column(String(128), index=True)
+    rule_ids: Mapped[list[Any]] = mapped_column(JSON, default=list)
+    input_event_ids: Mapped[list[Any]] = mapped_column(JSON, default=list)
+    evaluation_ids: Mapped[list[Any]] = mapped_column(JSON, default=list)
+    signal_ids: Mapped[list[Any]] = mapped_column(JSON, default=list)
+    engine_version: Mapped[str] = mapped_column(String(64))
+    started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    completed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    status: Mapped[str] = mapped_column(String(32), index=True)
+
+
+class DetectionEvaluationRow(Base):
+    __tablename__ = "detection_evaluations"
+    evaluation_id: Mapped[str] = mapped_column(String(128), primary_key=True)
+    run_id: Mapped[str] = mapped_column(String(128), index=True)
+    tenant_id: Mapped[str] = mapped_column(String(128), index=True)
+    case_id: Mapped[str] = mapped_column(String(128), index=True)
+    target_id: Mapped[str] = mapped_column(String(128), index=True)
+    rule_id: Mapped[str] = mapped_column(String(128), index=True)
+    rule_version: Mapped[int] = mapped_column(Integer)
+    input_event_ids: Mapped[list[Any]] = mapped_column(JSON, default=list)
+    evaluated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    matched_predicates: Mapped[list[Any]] = mapped_column(JSON, default=list)
+    result: Mapped[str] = mapped_column(String(32))
+    signal_id: Mapped[str | None] = mapped_column(String(128), index=True)
+    engine_version: Mapped[str] = mapped_column(String(64))
+    rule_digest: Mapped[str] = mapped_column(String(128))
+    idempotency_key: Mapped[str] = mapped_column(String(128), unique=True)
+
+
+class DetectionSignalRow(Base):
+    __tablename__ = "detection_signals"
+    signal_id: Mapped[str] = mapped_column(String(128), primary_key=True)
+    tenant_id: Mapped[str] = mapped_column(String(128), index=True)
+    case_id: Mapped[str] = mapped_column(String(128), index=True)
+    target_id: Mapped[str] = mapped_column(String(128), index=True)
+    rule_id: Mapped[str] = mapped_column(String(128), index=True)
+    rule_version: Mapped[int] = mapped_column(Integer)
+    event_ids: Mapped[list[Any]] = mapped_column(JSON, default=list)
+    source_signal_ids: Mapped[list[Any]] = mapped_column(JSON, default=list)
+    detected_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
+    severity: Mapped[str] = mapped_column(String(16))
+    confidence: Mapped[str] = mapped_column(String(16))
+    matched_predicates: Mapped[list[Any]] = mapped_column(JSON, default=list)
+    raw_evidence_refs: Mapped[list[Any]] = mapped_column(JSON, default=list)
+    rule_digest: Mapped[str] = mapped_column(String(128))
+    status: Mapped[str] = mapped_column(String(32), index=True)
+    idempotency_key: Mapped[str] = mapped_column(String(128), unique=True)
+
+
+class HuntExecutionRow(Base):
+    __tablename__ = "hunt_executions"
+    execution_id: Mapped[str] = mapped_column(String(128), primary_key=True)
+    plan_id: Mapped[str] = mapped_column(String(128), index=True)
+    hypothesis_id: Mapped[str] = mapped_column(String(128), index=True)
+    tenant_id: Mapped[str] = mapped_column(String(128), index=True)
+    case_id: Mapped[str] = mapped_column(String(128), index=True)
+    target_id: Mapped[str] = mapped_column(String(128), index=True)
+    query_digest: Mapped[str] = mapped_column(String(128))
+    input_event_ids: Mapped[list[Any]] = mapped_column(JSON, default=list)
+    input_signal_ids: Mapped[list[Any]] = mapped_column(JSON, default=list)
+    result_id: Mapped[str] = mapped_column(String(128), unique=True)
+    result: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
+    started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    completed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+
+
+class IncidentHypothesisRow(Base):
+    __tablename__ = "incident_hypotheses"
+    hypothesis_id: Mapped[str] = mapped_column(String(128), primary_key=True)
+    tenant_id: Mapped[str] = mapped_column(String(128), index=True)
+    case_id: Mapped[str] = mapped_column(String(128), index=True)
+    target_id: Mapped[str] = mapped_column(String(128), index=True)
+    question: Mapped[str] = mapped_column(Text)
+    source_signal_ids: Mapped[list[Any]] = mapped_column(JSON, default=list)
+    affected_entities: Mapped[list[Any]] = mapped_column(JSON, default=list)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
+
+
+class IncidentRow(Base):
+    __tablename__ = "incidents"
+    incident_id: Mapped[str] = mapped_column(String(128), primary_key=True)
+    hypothesis_id: Mapped[str] = mapped_column(String(128), index=True)
+    investigation_id: Mapped[str] = mapped_column(String(128), index=True)
+    adjudication_id: Mapped[str] = mapped_column(String(128), index=True)
+    tenant_id: Mapped[str] = mapped_column(String(128), index=True)
+    case_id: Mapped[str] = mapped_column(String(128), index=True)
+    target_id: Mapped[str] = mapped_column(String(128), index=True)
+    state: Mapped[str] = mapped_column(String(32), index=True)
+    severity: Mapped[str] = mapped_column(String(16))
+    confidence: Mapped[str] = mapped_column(String(16))
+    source_signal_ids: Mapped[list[Any]] = mapped_column(JSON, default=list)
+    observation_ids: Mapped[list[Any]] = mapped_column(JSON, default=list)
+    claim_ids: Mapped[list[Any]] = mapped_column(JSON, default=list)
+    supporting_evidence_refs: Mapped[list[Any]] = mapped_column(JSON, default=list)
+    contradicting_evidence_refs: Mapped[list[Any]] = mapped_column(JSON, default=list)
+    adjudicated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    authorized_action_executed: Mapped[bool] = mapped_column(Boolean, default=False)
+
+
+class ResponseProposalRow(Base):
+    __tablename__ = "response_proposals"
+    proposal_id: Mapped[str] = mapped_column(String(128), primary_key=True)
+    incident_id: Mapped[str] = mapped_column(String(128), index=True)
+    tenant_id: Mapped[str] = mapped_column(String(128), index=True)
+    case_id: Mapped[str] = mapped_column(String(128), index=True)
+    target_id: Mapped[str] = mapped_column(String(128), index=True)
+    action: Mapped[str] = mapped_column(String(64))
+    reason: Mapped[str] = mapped_column(Text)
+    supporting_evidence_refs: Mapped[list[Any]] = mapped_column(JSON, default=list)
+    expected_impact: Mapped[str] = mapped_column(Text)
+    risk: Mapped[str] = mapped_column(Text)
+    rollback_plan: Mapped[str] = mapped_column(Text)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
+    proposal_digest: Mapped[str] = mapped_column(String(128), unique=True)
+    opa_decision: Mapped[str] = mapped_column(String(32))
+    human_approval_state: Mapped[str] = mapped_column(String(32), index=True)
+    authorized_action_executed: Mapped[bool] = mapped_column(Boolean, default=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
+
+
+class SecuritySourceBindingRow(Base):
+    """A registered source identity bound to one canonical engagement scope."""
+
+    __tablename__ = "security_source_bindings"
+    source_id: Mapped[str] = mapped_column(String(128), primary_key=True)
+    principal_id: Mapped[str] = mapped_column(ForeignKey("principals.principal_id"), index=True)
+    tenant_id: Mapped[str] = mapped_column(String(128), index=True)
+    case_id: Mapped[str] = mapped_column(String(128), index=True)
+    target_id: Mapped[str] = mapped_column(String(128), index=True)
+    source_family: Mapped[str] = mapped_column(String(64))
+    source_type: Mapped[str] = mapped_column(String(128))
+    status: Mapped[str] = mapped_column(String(16), default="ACTIVE", index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
+
+    __table_args__ = (
+        ForeignKeyConstraint(
+            ["case_id", "target_id"],
+            ["engagement_targets.engagement_id", "engagement_targets.target_id"],
+            name="fk_security_source_binding_engagement_target",
+        ),
+    )
+
+
+class DetectionWorkItemRow(Base):
+    """Durable event-to-detection handoff with lease-based recovery."""
+
+    __tablename__ = "detection_work_items"
+    work_id: Mapped[str] = mapped_column(String(128), primary_key=True)
+    event_id: Mapped[str] = mapped_column(String(96), index=True)
+    tenant_id: Mapped[str] = mapped_column(String(128), index=True)
+    case_id: Mapped[str] = mapped_column(String(128), index=True)
+    target_id: Mapped[str] = mapped_column(String(128), index=True)
+    event_fingerprint: Mapped[str] = mapped_column(String(64))
+    status: Mapped[str] = mapped_column(String(16), default="PENDING", index=True)
+    attempts: Mapped[int] = mapped_column(Integer, default=0)
+    lease_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), index=True)
+    worker_id: Mapped[str | None] = mapped_column(String(128))
+    run_ids: Mapped[list[Any]] = mapped_column(JSON, default=list)
+    signal_ids: Mapped[list[Any]] = mapped_column(JSON, default=list)
+    last_error: Mapped[str | None] = mapped_column(String(128))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
+    completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+    __table_args__ = (
+        UniqueConstraint(
+            "tenant_id", "case_id", "target_id", "event_id", name="uq_detection_work_scope_event"
+        ),
+        Index("ix_detection_work_scope_status", "tenant_id", "case_id", "target_id", "status"),
+    )
+
+
+class HuntHypothesisRow(Base):
+    """Durable explicit hunt request; persistence precedes execution."""
+
+    __tablename__ = "hunt_hypotheses"
+    hypothesis_id: Mapped[str] = mapped_column(String(128), primary_key=True)
+    tenant_id: Mapped[str] = mapped_column(String(128), index=True)
+    case_id: Mapped[str] = mapped_column(String(128), index=True)
+    target_id: Mapped[str] = mapped_column(String(128), index=True)
+    question: Mapped[str] = mapped_column(Text)
+    entity_keys: Mapped[list[Any]] = mapped_column(JSON, default=list)
+    supporting_signal_ids: Mapped[list[Any]] = mapped_column(JSON, default=list)
+    required_evidence_refs: Mapped[list[Any]] = mapped_column(JSON, default=list)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
+
+
+class HuntPlanRow(Base):
+    """Durable bounded hunt plan and its recoverable request state."""
+
+    __tablename__ = "hunt_plans"
+    plan_id: Mapped[str] = mapped_column(String(128), primary_key=True)
+    hypothesis_id: Mapped[str] = mapped_column(String(128), index=True)
+    tenant_id: Mapped[str] = mapped_column(String(128), index=True)
+    case_id: Mapped[str] = mapped_column(String(128), index=True)
+    target_id: Mapped[str] = mapped_column(String(128), index=True)
+    window_start: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    window_end: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    query: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
+    exit_criteria: Mapped[str] = mapped_column(Text)
+    max_events: Mapped[int] = mapped_column(Integer, default=500)
+    status: Mapped[str] = mapped_column(String(16), default="PENDING", index=True)
+    lease_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    worker_id: Mapped[str | None] = mapped_column(String(128))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
+    completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+    __table_args__ = (
+        Index("ix_hunt_plans_scope_status", "tenant_id", "case_id", "target_id", "status"),
+        Index("ix_hunt_plans_status_lease", "status", "lease_until"),
+    )
+
+
+class IncidentInvestigationRow(Base):
+    """Durable evidence/claim investigation opened for one hypothesis."""
+
+    __tablename__ = "incident_investigations"
+    investigation_id: Mapped[str] = mapped_column(String(128), primary_key=True)
+    hypothesis_id: Mapped[str] = mapped_column(String(128), index=True)
+    tenant_id: Mapped[str] = mapped_column(String(128), index=True)
+    case_id: Mapped[str] = mapped_column(String(128), index=True)
+    target_id: Mapped[str] = mapped_column(String(128), index=True)
+    observation_ids: Mapped[list[Any]] = mapped_column(JSON, default=list)
+    claim_ids: Mapped[list[Any]] = mapped_column(JSON, default=list)
+    opened_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
+
+
+class ResponseCapabilityRequestRow(Base):
+    """Durable proposal capability request; it has no execution path."""
+
+    __tablename__ = "response_capability_requests"
+    request_id: Mapped[str] = mapped_column(String(128), primary_key=True)
+    proposal_id: Mapped[str] = mapped_column(ForeignKey("response_proposals.proposal_id"), index=True)
+    tenant_id: Mapped[str] = mapped_column(String(128), index=True)
+    case_id: Mapped[str] = mapped_column(String(128), index=True)
+    target_id: Mapped[str] = mapped_column(String(128), index=True)
+    action: Mapped[str] = mapped_column(String(64))
+    proposal_digest: Mapped[str] = mapped_column(String(128))
+    requested_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
+
+    __table_args__ = (
+        UniqueConstraint("proposal_id", "proposal_digest", name="uq_response_capability_request_proposal"),
+    )
