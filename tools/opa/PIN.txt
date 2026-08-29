@@ -4,6 +4,8 @@ version: v1.19.0
 platform: windows_amd64
 url: https://github.com/open-policy-agent/opa/releases/download/v1.19.0/opa_windows_amd64.exe
 sha256: ed4ee673b2182352af3a9d5f0de4a74d23a063cbbb447723fb21ac5ead8cd599
+linux_amd64_url: https://github.com/open-policy-agent/opa/releases/download/v1.19.0/opa_linux_amd64
+linux_amd64_sha256: 4ae5eeec241c9f5df7c5f566fe96e26336ce186f8c773c46ffdf10b48189a520
 fetched: 2026-08-14
 verified: true
 notes:
