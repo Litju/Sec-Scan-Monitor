@@ -1,0 +1,19 @@
+title: SecScan suspicious encoded endpoint process
+id: secscan-v03-endpoint-encoded-process
+status: stable
+description: Detects a bounded endpoint process fixture with a suspicious encoded command.
+author: SecScanMonitor
+references:
+  - https://attack.mitre.org/techniques/T1059/001/
+tags:
+  - attack.t1059.001
+logsource:
+  category: process_creation
+detection:
+  selection:
+    process.name: powershell
+    process.command_line|contains: encoded
+  condition: selection
+level: high
+x_secscan_confidence: high
+x_secscan_rationale: Endpoint process creation is a bounded source family; encoded command evidence is retained by reference.

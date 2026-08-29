@@ -1,0 +1,20 @@
+title: SecScan privileged MCP tool use
+id: secscan-v03-mcp-privileged-tool
+status: stable
+description: Detects a bounded MCP gateway fixture for a privileged deploy tool.
+author: SecScanMonitor
+references:
+  - https://atlas.mitre.org/
+tags:
+  - atlas.aml.t0048
+logsource:
+  product: mcp
+detection:
+  selection:
+    action: deploy
+    object: privileged_tool
+    outcome: allowed
+  condition: selection
+level: critical
+x_secscan_confidence: medium
+x_secscan_rationale: MCP tool authorization is evaluated as source activity, not as proof of an incident.

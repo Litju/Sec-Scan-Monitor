@@ -9,6 +9,11 @@ export const EXPERIENCE_STATUSES = [
   "DEGRADED",
   "VERIFIED",
   "CONTRADICTED",
+  "CANDIDATE",
+  "CONFIRMED",
+  "DISMISSED",
+  "APPROVED",
+  "EXPIRED",
   "UNKNOWN",
 ] as const;
 
@@ -101,6 +106,61 @@ export type ExperienceRunnerView = {
   source: string;
 };
 
+export type ExperienceDetectionSignalView = {
+  id: string;
+  signalId: string;
+  caseId: string;
+  ruleId: string;
+  ruleVersion: number;
+  severity: string;
+  confidence: string;
+  state: ExperienceStatus;
+  eventIds: string[];
+  evidenceRefs: string[];
+  scope: ExperienceScope;
+  source: string;
+};
+
+export type ExperienceHuntView = {
+  id: string;
+  huntId: string;
+  hypothesisId: string;
+  caseId: string;
+  disposition: ExperienceStatus;
+  state: ExperienceStatus;
+  evidenceRefs: string[];
+  scope: ExperienceScope;
+  source: string;
+};
+
+export type ExperienceIncidentView = {
+  id: string;
+  incidentId: string;
+  caseId: string;
+  state: ExperienceStatus;
+  severity: string;
+  confidence: string;
+  signalIds: string[];
+  evidenceRefs: string[];
+  scope: ExperienceScope;
+  provenance: ProvenanceView;
+};
+
+export type ExperienceResponseProposalView = {
+  id: string;
+  proposalId: string;
+  incidentId: string;
+  caseId: string;
+  targetId: string;
+  action: string;
+  opaDecision: ExperienceStatus;
+  humanApprovalState: ExperienceStatus;
+  state: ExperienceStatus;
+  evidenceRefs: string[];
+  scope: ExperienceScope;
+  source: string;
+};
+
 export type GraphNodeView = {
   id: string;
   kind: "case" | "client" | "target" | "snapshot" | "finding" | "evidence" | "capability" | "runner" | "policy" | string;
@@ -134,6 +194,10 @@ export type ExperienceSnapshot = {
   graphNodes: GraphNodeView[];
   graphEdges: GraphEdgeView[];
   runners: ExperienceRunnerView[];
+  detectionSignals?: ExperienceDetectionSignalView[];
+  hunts?: ExperienceHuntView[];
+  incidents?: ExperienceIncidentView[];
+  responseProposals?: ExperienceResponseProposalView[];
 };
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -156,6 +220,40 @@ function isProvenance(value: unknown): value is ProvenanceView {
     && typeof value.observedAt === "string"
     && isStringArray(value.evidenceRefs)
     && EXPERIENCE_STATUSES.includes(value.status as ExperienceStatus);
+}
+
+function isDetectionResponseProjection(value: unknown): boolean {
+  if (!isRecord(value)) return false;
+  const arrays = ["detectionSignals", "hunts", "incidents", "responseProposals"]
+    .map((key) => value[key])
+    .filter((items) => items !== undefined);
+  if (arrays.some((items) => !Array.isArray(items))) return false;
+  const signals = value.detectionSignals as unknown[] | undefined;
+  const hunts = value.hunts as unknown[] | undefined;
+  const incidents = value.incidents as unknown[] | undefined;
+  const proposals = value.responseProposals as unknown[] | undefined;
+  return (signals ?? []).every((item) => isRecord(item)
+    && typeof item.id === "string" && typeof item.signalId === "string" && typeof item.caseId === "string"
+    && typeof item.ruleId === "string" && typeof item.ruleVersion === "number" && typeof item.severity === "string"
+    && typeof item.confidence === "string" && EXPERIENCE_STATUSES.includes(item.state as ExperienceStatus)
+    && isStringArray(item.eventIds) && isStringArray(item.evidenceRefs) && isScope(item.scope) && typeof item.source === "string")
+    && (hunts ?? []).every((item) => isRecord(item)
+      && typeof item.id === "string" && typeof item.huntId === "string" && typeof item.hypothesisId === "string"
+      && typeof item.caseId === "string" && EXPERIENCE_STATUSES.includes(item.disposition as ExperienceStatus)
+      && EXPERIENCE_STATUSES.includes(item.state as ExperienceStatus) && isStringArray(item.evidenceRefs)
+      && isScope(item.scope) && typeof item.source === "string")
+    && (incidents ?? []).every((item) => isRecord(item)
+      && typeof item.id === "string" && typeof item.incidentId === "string" && typeof item.caseId === "string"
+      && EXPERIENCE_STATUSES.includes(item.state as ExperienceStatus) && typeof item.severity === "string"
+      && typeof item.confidence === "string" && isStringArray(item.signalIds) && isStringArray(item.evidenceRefs)
+      && isScope(item.scope) && isProvenance(item.provenance))
+    && (proposals ?? []).every((item) => isRecord(item)
+      && typeof item.id === "string" && typeof item.proposalId === "string" && typeof item.incidentId === "string"
+      && typeof item.caseId === "string" && typeof item.targetId === "string" && typeof item.action === "string"
+      && EXPERIENCE_STATUSES.includes(item.opaDecision as ExperienceStatus)
+      && EXPERIENCE_STATUSES.includes(item.humanApprovalState as ExperienceStatus)
+      && EXPERIENCE_STATUSES.includes(item.state as ExperienceStatus) && isStringArray(item.evidenceRefs)
+      && isScope(item.scope) && typeof item.source === "string");
 }
 
 export function isExperienceSnapshot(value: unknown): value is ExperienceSnapshot {
@@ -200,7 +298,8 @@ export function isExperienceSnapshot(value: unknown): value is ExperienceSnapsho
       && typeof item.id === "string" && typeof item.runnerId === "string" && typeof item.capabilityId === "string"
       && EXPERIENCE_STATUSES.includes(item.state as ExperienceStatus)
       && EXPERIENCE_STATUSES.includes(item.policyDecision as ExperienceStatus)
-      && isStringArray(item.evidenceRefs) && isScope(item.scope) && typeof item.source === "string");
+      && isStringArray(item.evidenceRefs) && isScope(item.scope) && typeof item.source === "string")
+    && isDetectionResponseProjection(value);
 }
 
 export type StreamEnvelope<T> = {
@@ -288,5 +387,5 @@ export function safeDisplay(value: string): string {
 }
 
 export function emptyExperienceSnapshot(mode: DataMode, sourceLabel: string, connectionState: ConnectionState = "UNAVAILABLE"): ExperienceSnapshot {
-  return { mode, connectionState, sourceLabel, tenantId: "unknown", attention: [], cases: [], findings: [], activity: [], graphNodes: [], graphEdges: [], runners: [] };
+  return { mode, connectionState, sourceLabel, tenantId: "unknown", attention: [], cases: [], findings: [], activity: [], graphNodes: [], graphEdges: [], runners: [], detectionSignals: [], hunts: [], incidents: [], responseProposals: [] };
 }

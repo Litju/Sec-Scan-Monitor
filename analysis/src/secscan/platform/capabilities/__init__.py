@@ -1,7 +1,8 @@
 """Capability registry (ADR-0007).
 
 Agents request registered capabilities; they never execute arbitrary
-binaries. Only safe foundation capabilities are seeded in this campaign.
+binaries. Safe foundation capabilities and explicitly approval-gated response
+control capabilities are registered separately.
 Future aggressive engines (Semgrep, OSV-Scanner, Gitleaks, Trivy, PyRIT,
 garak, PentAGI, Caldera/OpenAEV, OpenCTI, Velociraptor, Volatility, Falco,
 Tetragon) become adapters that fit this registry without core changes.
@@ -94,6 +95,29 @@ FOUNDATION_CAPABILITIES: list[CapabilityManifest] = [
         tool_version="1.0.0",
         evidence_type="observation",
         command_allowlist=["python"],
+    ),
+]
+
+RESPONSE_CONTROL_CAPABILITIES: list[CapabilityManifest] = [
+    CapabilityManifest(
+        capability_id=CapabilityId("CAP-V03-RESPONSE-PROPOSAL"),
+        version="1.0.0",
+        description="Create an evidence-bound response proposal for human review; never executes an action.",
+        risk_class=RiskClass.HIGH,
+        accepted_inputs=["confirmed_incident", "evidence_refs"],
+        produced_outputs=["response_proposal", "human_approval_request"],
+        required_authority=Action.REMEDIATE.value,
+        requires_approval=True,
+        sandbox_profile="none",
+        sandbox_requirement=SandboxRequirement.NONE,
+        network_policy=NetworkPolicy.NONE,
+        timeout_seconds=60,
+        resource_limits={"cpu": "1", "memory": "256m", "pids": "32"},
+        tool_identity="secscan-v03-response-control-plane",
+        tool_version="1.0.0",
+        evidence_type="response-proposal",
+        failure_semantics="OPA denial or missing human approval never executes an action",
+        command_allowlist=[],
     ),
 ]
 
@@ -213,7 +237,11 @@ class CapabilityRegistry:
 
     def __init__(self, manifests: list[CapabilityManifest] | None = None) -> None:
         self._manifests: dict[tuple[CapabilityId, str], CapabilityManifest] = {}
-        for manifest in manifests or [*FOUNDATION_CAPABILITIES, *F200_SCANNER_CAPABILITIES]:
+        for manifest in manifests or [
+            *FOUNDATION_CAPABILITIES,
+            *RESPONSE_CONTROL_CAPABILITIES,
+            *F200_SCANNER_CAPABILITIES,
+        ]:
             self.register(manifest)
 
     def register(self, manifest: CapabilityManifest) -> None:

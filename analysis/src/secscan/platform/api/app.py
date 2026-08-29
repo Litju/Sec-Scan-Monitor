@@ -16,15 +16,26 @@ import hmac
 import ipaddress
 import logging
 from dataclasses import dataclass, field
+from datetime import UTC, datetime
 from typing import Any, Callable, cast
 
 from fastapi import Depends, FastAPI, Header, HTTPException, Query, Request, Response
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from secscan.platform.application.authority_service import AuthorityService
 from secscan.platform.application.engagement_service import EngagementService
+from secscan.platform.application.live_control_plane import LiveControlPlaneService
+from secscan.platform.application.live_ingest import LiveSecurityEventInput
 from secscan.platform.audit import InMemoryAuditSink
+from secscan.platform.continuous_security.events import EventIdentityConflict
+from secscan.platform.detection_response.domain import (
+    HuntHypothesis,
+    HuntPlan,
+    ResponseAction,
+    Scope,
+)
 from secscan.platform.domain.authority import Approval
+from secscan.platform.domain.common import Confidence, Severity
 from secscan.platform.domain.engagement import (
     AuthorityLevel,
     Engagement,
@@ -50,6 +61,7 @@ from secscan.platform.hosted.identity import (
     extract_bearer_token,
 )
 from secscan.platform.policy import DeterministicDecisionAdapter
+from secscan.platform.read_models import InMemoryReadModelService
 
 OPERATOR_PRINCIPAL = PrincipalId("PRN-OPERATOR")
 LOGGER = logging.getLogger(__name__)
@@ -136,6 +148,10 @@ class AppState:
     assessment_plans: dict[str, dict[str, Any]] = field(default_factory=dict)
     service_runs: dict[str, list[dict[str, Any]]] = field(default_factory=dict)
     qualification: dict[str, dict[str, Any]] = field(default_factory=dict)
+    detection_signals: dict[str, Any] = field(default_factory=dict)
+    hunts: dict[str, Any] = field(default_factory=dict)
+    incidents: dict[str, Any] = field(default_factory=dict)
+    response_proposals: dict[str, Any] = field(default_factory=dict)
 
 
 def create_app(
@@ -153,6 +169,7 @@ def create_app(
     hosted_workflow_executor: Any | None = None,
     hosted_workflow_secret: str | None = None,
     hosted_token_revocation_store: Any | None = None,
+    live_control_plane: LiveControlPlaneService | None = None,
 ) -> FastAPI:
     """Localhost-first firm API.
 
@@ -183,10 +200,12 @@ def create_app(
             hosted_workflow_executor,
             hosted_workflow_secret,
             hosted_token_revocation_store,
+            live_control_plane,
         )
 
     state = state or AppState()
     auth = LocalOperatorAuth(bind_host=bind_host)
+    local_read_models = InMemoryReadModelService(state)
     engagement_service = EngagementService(audit=state.audit)
     app = FastAPI(title="SecScanMonitor Firm API", version="0.1.0", docs_url=None, redoc_url=None)
 
@@ -209,9 +228,243 @@ def create_app(
     ) -> PrincipalId:
         return auth.authenticate(principal_header, request)
 
+    def _live() -> LiveControlPlaneService:
+        if live_control_plane is None:
+            raise HTTPException(status_code=503, detail="live control plane is not configured")
+        return live_control_plane
+
+    def _live_page(items: list[dict[str, Any]]) -> dict[str, Any]:
+        return {"items": items, "next_cursor": None, "limit": 100}
+
     @app.get("/health")
     def health() -> dict[str, str]:
         return {"status": "ok", "service": "secscan-platform", "version": "0.1.0"}
+
+    @app.get("/experience")
+    def experience(principal: PrincipalId = Depends(_principal)) -> dict[str, Any]:
+        snapshot = local_read_models.experience()
+        if live_control_plane is not None:
+            return live_control_plane.experience_overlay(
+                snapshot,
+                access_principal_id=str(principal),
+            )
+        return snapshot
+
+    @app.get("/clients")
+    def list_clients(principal: PrincipalId = Depends(_principal)) -> dict[str, Any]:
+        return local_read_models.list_clients().model_dump(mode="json")
+
+    @app.get("/targets")
+    def list_targets(principal: PrincipalId = Depends(_principal)) -> dict[str, Any]:
+        return local_read_models.list_targets().model_dump(mode="json")
+
+    @app.get("/engagements")
+    def list_engagements(principal: PrincipalId = Depends(_principal)) -> dict[str, Any]:
+        return local_read_models.list_engagements().model_dump(mode="json")
+
+    @app.get("/findings")
+    def list_findings_page(principal: PrincipalId = Depends(_principal)) -> dict[str, Any]:
+        return local_read_models.list_findings().model_dump(mode="json")
+
+    @app.get("/evidence")
+    def list_evidence_page(principal: PrincipalId = Depends(_principal)) -> dict[str, Any]:
+        return local_read_models.list_evidence().model_dump(mode="json")
+
+    @app.get("/audit")
+    def list_audit_page(principal: PrincipalId = Depends(_principal)) -> dict[str, Any]:
+        return local_read_models.list_audit().model_dump(mode="json")
+
+    @app.get("/approvals")
+    def list_approvals_page(principal: PrincipalId = Depends(_principal)) -> dict[str, Any]:
+        if live_control_plane is not None:
+            return _live_page(live_control_plane.read_approvals(access_principal_id=str(principal)))
+        items = [
+            {
+                "approval_id": str(approval.approval_id),
+                "engagement_id": str(approval.engagement_id),
+                "requested_by": str(approval.requested_by_principal_id),
+                "request_ref": approval.request_ref,
+                "target_id": str(approval.target_id),
+                "capability_id": str(approval.capability_id),
+                "action": approval.action.value,
+                "risk": "not_validated",
+                "decision": approval.decision,
+                "request_fingerprint": f"local:{approval.approval_id}",
+                "rationale": approval.rationale,
+            }
+            for approval in state.approvals.values()
+        ]
+        return {"items": items, "next_cursor": None, "limit": 50}
+
+    @app.get("/detection/signals")
+    def list_detection_signals_page(principal: PrincipalId = Depends(_principal)) -> dict[str, Any]:
+        if live_control_plane is not None:
+            return _live_page(live_control_plane.read_detection_signals(access_principal_id=str(principal)))
+        return local_read_models.list_detection_signals().model_dump(mode="json")
+
+    @app.get("/hunts")
+    def list_hunts_page(principal: PrincipalId = Depends(_principal)) -> dict[str, Any]:
+        if live_control_plane is not None:
+            return _live_page(live_control_plane.read_hunts(access_principal_id=str(principal)))
+        return local_read_models.list_hunts().model_dump(mode="json")
+
+    @app.get("/incidents")
+    def list_incidents_page(principal: PrincipalId = Depends(_principal)) -> dict[str, Any]:
+        if live_control_plane is not None:
+            return _live_page(live_control_plane.read_incidents(access_principal_id=str(principal)))
+        return local_read_models.list_incidents().model_dump(mode="json")
+
+    @app.get("/response-proposals")
+    def list_response_proposals_page(principal: PrincipalId = Depends(_principal)) -> dict[str, Any]:
+        if live_control_plane is not None:
+            return _live_page(live_control_plane.read_response_proposals(access_principal_id=str(principal)))
+        return local_read_models.list_response_proposals().model_dump(mode="json")
+
+    @app.post("/security-events")
+    def ingest_live_security_event(
+        payload: LiveSecurityEventInput,
+        principal: PrincipalId = Depends(_principal),
+    ) -> dict[str, Any]:
+        try:
+            receipt = _live().ingest.ingest(
+                payload,
+                principal_id=str(principal),
+                access_principal_id=str(principal),
+            )
+        except EventIdentityConflict as exc:
+            raise HTTPException(status_code=409, detail="conflicting event replay denied") from exc
+        except PermissionError as exc:
+            raise HTTPException(status_code=403, detail="live event authorization denied") from exc
+        except (KeyError, ValueError) as exc:
+            raise HTTPException(status_code=409, detail="live event rejected") from exc
+        except Exception as exc:
+            LOGGER.error("live security event failed closed: %s", type(exc).__name__)
+            raise HTTPException(status_code=503, detail="live security event unavailable") from exc
+        return {"ingest": receipt.model_dump(mode="json")}
+
+    @app.post("/hunts")
+    def request_live_hunt(
+        payload: LiveHuntRequest,
+        principal: PrincipalId = Depends(_principal),
+    ) -> dict[str, Any]:
+        try:
+            result = _live().incidents.request_hunt(
+                payload.hypothesis,
+                payload.plan,
+                requested_by=str(principal),
+                access_principal_id=str(principal),
+            )
+        except PermissionError as exc:
+            raise HTTPException(status_code=403, detail="hunt authorization denied") from exc
+        except (KeyError, ValueError) as exc:
+            raise HTTPException(status_code=409, detail="hunt request rejected") from exc
+        except Exception as exc:
+            LOGGER.error("live hunt failed closed: %s", type(exc).__name__)
+            raise HTTPException(status_code=503, detail="live hunt unavailable") from exc
+        return cast(dict[str, Any], result.model_dump(mode="json"))
+
+    @app.post("/incident-hypotheses")
+    def open_live_incident_hypothesis(
+        payload: LiveIncidentHypothesisRequest,
+        principal: PrincipalId = Depends(_principal),
+    ) -> dict[str, Any]:
+        try:
+            hypothesis = _live().incidents.open_incident_hypothesis(
+                scope=payload.scope,
+                question=payload.question,
+                source_signal_ids=payload.source_signal_ids,
+                affected_entities=payload.affected_entities,
+                requested_by=str(principal),
+                access_principal_id=str(principal),
+            )
+        except PermissionError as exc:
+            raise HTTPException(status_code=403, detail="incident hypothesis authorization denied") from exc
+        except (KeyError, ValueError) as exc:
+            raise HTTPException(status_code=409, detail="incident hypothesis rejected") from exc
+        except Exception as exc:
+            LOGGER.error("live incident hypothesis failed closed: %s", type(exc).__name__)
+            raise HTTPException(status_code=503, detail="incident hypothesis unavailable") from exc
+        return hypothesis.model_dump(mode="json", by_alias=True)
+
+    @app.post("/incident-hypotheses/{hypothesis_id}/adjudicate")
+    def adjudicate_live_incident(
+        hypothesis_id: str,
+        payload: LiveAdjudicationRequest,
+        principal: PrincipalId = Depends(_principal),
+    ) -> dict[str, Any]:
+        try:
+            incident = _live().incidents.adjudicate_incident(
+                hypothesis_id=hypothesis_id,
+                supporting_claim_ids=payload.supporting_claim_ids,
+                supporting_evidence_refs=payload.supporting_evidence_refs,
+                contradicting_claim_ids=payload.contradicting_claim_ids,
+                contradicting_evidence_refs=payload.contradicting_evidence_refs,
+                observation_ids=payload.observation_ids,
+                decided_by=str(principal),
+                reason=payload.reason,
+                severity=payload.severity,
+                confidence=payload.confidence,
+                access_principal_id=str(principal),
+            )
+        except PermissionError as exc:
+            raise HTTPException(status_code=403, detail="incident adjudication authorization denied") from exc
+        except (KeyError, ValueError) as exc:
+            raise HTTPException(status_code=409, detail="incident adjudication rejected") from exc
+        except Exception as exc:
+            LOGGER.error("live incident adjudication failed closed: %s", type(exc).__name__)
+            raise HTTPException(status_code=503, detail="incident adjudication unavailable") from exc
+        return cast(dict[str, Any], incident.model_dump(mode="json", by_alias=True))
+
+    @app.post("/response-proposals")
+    def create_live_response_proposal(
+        payload: LiveResponseProposalRequest,
+        principal: PrincipalId = Depends(_principal),
+    ) -> dict[str, Any]:
+        try:
+            proposal = _live().incidents.propose_response(
+                incident_id=payload.incident_id,
+                scope=payload.scope,
+                action=payload.action,
+                reason=payload.reason,
+                expected_impact=payload.expected_impact,
+                risk=payload.risk,
+                rollback_plan=payload.rollback_plan,
+                expires_at=payload.expires_at,
+                requested_by=str(principal),
+                access_principal_id=str(principal),
+            )
+        except PermissionError as exc:
+            raise HTTPException(status_code=403, detail="response proposal authorization denied") from exc
+        except (KeyError, ValueError) as exc:
+            raise HTTPException(status_code=409, detail="response proposal rejected") from exc
+        except Exception as exc:
+            LOGGER.error("live response proposal failed closed: %s", type(exc).__name__)
+            raise HTTPException(status_code=503, detail="live response proposal unavailable") from exc
+        return proposal.model_dump(mode="json", by_alias=True)
+
+    @app.post("/response-proposals/{proposal_id}/approval")
+    def decide_live_response_approval(
+        proposal_id: str,
+        payload: LiveApprovalRequest,
+        principal: PrincipalId = Depends(_principal),
+    ) -> dict[str, Any]:
+        try:
+            proposal = _live().incidents.decide_response_approval(
+                proposal_id=proposal_id,
+                scope=payload.scope,
+                decided_by=str(principal),
+                decision=payload.decision,
+                rationale=payload.rationale,
+                access_principal_id=str(principal),
+            )
+        except PermissionError as exc:
+            raise HTTPException(status_code=403, detail="response approval authorization denied") from exc
+        except (KeyError, ValueError) as exc:
+            raise HTTPException(status_code=409, detail="response approval rejected") from exc
+        except Exception as exc:
+            LOGGER.error("live response approval failed closed: %s", type(exc).__name__)
+            raise HTTPException(status_code=503, detail="live response approval unavailable") from exc
+        return proposal.model_dump(mode="json", by_alias=True)
 
     @app.post("/clients")
     def create_client(payload: dict[str, Any], principal: PrincipalId = Depends(_principal)) -> dict[str, Any]:
@@ -303,9 +556,12 @@ def create_app(
 
     @app.get("/capabilities")
     def list_capabilities(principal: PrincipalId = Depends(_principal)) -> list[dict[str, Any]]:
-        from secscan.platform.capabilities import FOUNDATION_CAPABILITIES
+        from secscan.platform.capabilities import FOUNDATION_CAPABILITIES, RESPONSE_CONTROL_CAPABILITIES
 
-        return [capability.model_dump(mode="json") for capability in FOUNDATION_CAPABILITIES]
+        return [
+            capability.model_dump(mode="json")
+            for capability in [*FOUNDATION_CAPABILITIES, *RESPONSE_CONTROL_CAPABILITIES]
+        ]
 
     @app.get("/services")
     def list_services(principal: PrincipalId = Depends(_principal)) -> list[dict[str, Any]]:
@@ -449,6 +705,7 @@ def _create_hosted_app(
     workflow_executor: Any | None,
     workflow_secret: str | None,
     token_revocation_store: Any | None,
+    live_control_plane: LiveControlPlaneService | None,
 ) -> FastAPI:
     """Hosted authenticated command/read surface over canonical PostgreSQL."""
 
@@ -510,6 +767,11 @@ def _create_hosted_app(
             raise HTTPException(status_code=503, detail="private evidence store is not ready")
         return evidence_store
 
+    def _require_live() -> LiveControlPlaneService:
+        if live_control_plane is None:
+            raise HTTPException(status_code=503, detail="live control plane is not configured")
+        return live_control_plane
+
     @app.post("/internal/workflows/{workflow_run_id}/execute")
     def hosted_execute_workflow(
         workflow_run_id: str,
@@ -570,6 +832,17 @@ def _create_hosted_app(
     @app.get("/firm/summary")
     def hosted_summary(identity: VerifiedHumanIdentity = Depends(_human_identity)) -> dict[str, Any]:
         return cast(dict[str, Any], read_model_service.firm_summary(identity=identity).model_dump(mode="json"))
+
+    @app.get("/experience")
+    def hosted_experience(identity: VerifiedHumanIdentity = Depends(_human_identity)) -> dict[str, Any]:
+        experience = getattr(read_model_service, "experience", None)
+        if not callable(experience):
+            raise HTTPException(status_code=503, detail="canonical experience projection is not ready")
+        try:
+            return cast(dict[str, Any], experience(identity=identity))
+        except Exception as exc:
+            LOGGER.error("hosted experience projection failed closed: %s", type(exc).__name__)
+            raise HTTPException(status_code=503, detail="canonical experience projection unavailable") from exc
 
     @app.get("/clients")
     def hosted_clients(
@@ -692,6 +965,198 @@ def _create_hosted_app(
         return cast(dict[str, Any], read_model_service.list_findings(
             identity=identity, engagement_id=engagement_id, cursor=cursor, limit=limit
         ).model_dump(mode="json"))
+
+    @app.get("/detection/signals")
+    def hosted_detection_signals(
+        cursor: str | None = None,
+        limit: int = Query(default=50, ge=1, le=100),
+        identity: VerifiedHumanIdentity = Depends(_human_identity),
+    ) -> dict[str, Any]:
+        return cast(dict[str, Any], read_model_service.list_detection_signals(
+            identity=identity, cursor=cursor, limit=limit
+        ).model_dump(mode="json"))
+
+    @app.get("/hunts")
+    def hosted_hunts(
+        cursor: str | None = None,
+        limit: int = Query(default=50, ge=1, le=100),
+        identity: VerifiedHumanIdentity = Depends(_human_identity),
+    ) -> dict[str, Any]:
+        return cast(dict[str, Any], read_model_service.list_hunts(
+            identity=identity, cursor=cursor, limit=limit
+        ).model_dump(mode="json"))
+
+    @app.get("/incidents")
+    def hosted_incidents(
+        cursor: str | None = None,
+        limit: int = Query(default=50, ge=1, le=100),
+        identity: VerifiedHumanIdentity = Depends(_human_identity),
+    ) -> dict[str, Any]:
+        return cast(dict[str, Any], read_model_service.list_incidents(
+            identity=identity, cursor=cursor, limit=limit
+        ).model_dump(mode="json"))
+
+    @app.get("/response-proposals")
+    def hosted_response_proposals(
+        cursor: str | None = None,
+        limit: int = Query(default=50, ge=1, le=100),
+        identity: VerifiedHumanIdentity = Depends(_human_identity),
+    ) -> dict[str, Any]:
+        return cast(dict[str, Any], read_model_service.list_response_proposals(
+            identity=identity, cursor=cursor, limit=limit
+        ).model_dump(mode="json"))
+
+    @app.post("/security-events")
+    def hosted_ingest_live_security_event(
+        payload: LiveSecurityEventInput,
+        identity: VerifiedHumanIdentity = Depends(_human_identity),
+    ) -> dict[str, Any]:
+        actor = identity.human_principal_id
+        try:
+            receipt = _require_live().ingest.ingest(
+                payload,
+                principal_id=actor,
+                access_principal_id=actor,
+            )
+        except EventIdentityConflict as exc:
+            raise HTTPException(status_code=409, detail="conflicting event replay denied") from exc
+        except PermissionError as exc:
+            raise HTTPException(status_code=403, detail="live event authorization denied") from exc
+        except (KeyError, ValueError) as exc:
+            raise HTTPException(status_code=409, detail="live event rejected") from exc
+        except Exception as exc:
+            LOGGER.error("hosted live security event failed closed: %s", type(exc).__name__)
+            raise HTTPException(status_code=503, detail="live security event unavailable") from exc
+        return {"ingest": receipt.model_dump(mode="json")}
+
+    @app.post("/hunts")
+    def hosted_request_live_hunt(
+        payload: LiveHuntRequest,
+        identity: VerifiedHumanIdentity = Depends(_human_identity),
+    ) -> dict[str, Any]:
+        actor = identity.human_principal_id
+        try:
+            result = _require_live().incidents.request_hunt(
+                payload.hypothesis,
+                payload.plan,
+                requested_by=actor,
+                access_principal_id=actor,
+            )
+        except PermissionError as exc:
+            raise HTTPException(status_code=403, detail="hunt authorization denied") from exc
+        except (KeyError, ValueError) as exc:
+            raise HTTPException(status_code=409, detail="hunt request rejected") from exc
+        except Exception as exc:
+            LOGGER.error("hosted live hunt failed closed: %s", type(exc).__name__)
+            raise HTTPException(status_code=503, detail="live hunt unavailable") from exc
+        return cast(dict[str, Any], result.model_dump(mode="json"))
+
+    @app.post("/incident-hypotheses")
+    def hosted_open_live_incident_hypothesis(
+        payload: LiveIncidentHypothesisRequest,
+        identity: VerifiedHumanIdentity = Depends(_human_identity),
+    ) -> dict[str, Any]:
+        actor = identity.human_principal_id
+        try:
+            hypothesis = _require_live().incidents.open_incident_hypothesis(
+                scope=payload.scope,
+                question=payload.question,
+                source_signal_ids=payload.source_signal_ids,
+                affected_entities=payload.affected_entities,
+                requested_by=actor,
+                access_principal_id=actor,
+            )
+        except PermissionError as exc:
+            raise HTTPException(status_code=403, detail="incident hypothesis authorization denied") from exc
+        except (KeyError, ValueError) as exc:
+            raise HTTPException(status_code=409, detail="incident hypothesis rejected") from exc
+        except Exception as exc:
+            LOGGER.error("hosted live incident hypothesis failed closed: %s", type(exc).__name__)
+            raise HTTPException(status_code=503, detail="incident hypothesis unavailable") from exc
+        return hypothesis.model_dump(mode="json", by_alias=True)
+
+    @app.post("/incident-hypotheses/{hypothesis_id}/adjudicate")
+    def hosted_adjudicate_live_incident(
+        hypothesis_id: str,
+        payload: LiveAdjudicationRequest,
+        identity: VerifiedHumanIdentity = Depends(_human_identity),
+    ) -> dict[str, Any]:
+        actor = identity.human_principal_id
+        try:
+            incident = _require_live().incidents.adjudicate_incident(
+                hypothesis_id=hypothesis_id,
+                supporting_claim_ids=payload.supporting_claim_ids,
+                supporting_evidence_refs=payload.supporting_evidence_refs,
+                contradicting_claim_ids=payload.contradicting_claim_ids,
+                contradicting_evidence_refs=payload.contradicting_evidence_refs,
+                observation_ids=payload.observation_ids,
+                decided_by=actor,
+                reason=payload.reason,
+                severity=payload.severity,
+                confidence=payload.confidence,
+                access_principal_id=actor,
+            )
+        except PermissionError as exc:
+            raise HTTPException(status_code=403, detail="incident adjudication authorization denied") from exc
+        except (KeyError, ValueError) as exc:
+            raise HTTPException(status_code=409, detail="incident adjudication rejected") from exc
+        except Exception as exc:
+            LOGGER.error("hosted live incident adjudication failed closed: %s", type(exc).__name__)
+            raise HTTPException(status_code=503, detail="incident adjudication unavailable") from exc
+        return cast(dict[str, Any], incident.model_dump(mode="json", by_alias=True))
+
+    @app.post("/response-proposals")
+    def hosted_create_live_response_proposal(
+        payload: LiveResponseProposalRequest,
+        identity: VerifiedHumanIdentity = Depends(_human_identity),
+    ) -> dict[str, Any]:
+        actor = identity.human_principal_id
+        try:
+            proposal = _require_live().incidents.propose_response(
+                incident_id=payload.incident_id,
+                scope=payload.scope,
+                action=payload.action,
+                reason=payload.reason,
+                expected_impact=payload.expected_impact,
+                risk=payload.risk,
+                rollback_plan=payload.rollback_plan,
+                expires_at=payload.expires_at,
+                requested_by=actor,
+                access_principal_id=actor,
+            )
+        except PermissionError as exc:
+            raise HTTPException(status_code=403, detail="response proposal authorization denied") from exc
+        except (KeyError, ValueError) as exc:
+            raise HTTPException(status_code=409, detail="response proposal rejected") from exc
+        except Exception as exc:
+            LOGGER.error("hosted live response proposal failed closed: %s", type(exc).__name__)
+            raise HTTPException(status_code=503, detail="live response proposal unavailable") from exc
+        return proposal.model_dump(mode="json", by_alias=True)
+
+    @app.post("/response-proposals/{proposal_id}/approval")
+    def hosted_decide_live_response_approval(
+        proposal_id: str,
+        payload: LiveApprovalRequest,
+        identity: VerifiedHumanIdentity = Depends(_human_identity),
+    ) -> dict[str, Any]:
+        actor = identity.human_principal_id
+        try:
+            proposal = _require_live().incidents.decide_response_approval(
+                proposal_id=proposal_id,
+                scope=payload.scope,
+                decided_by=actor,
+                decision=payload.decision,
+                rationale=payload.rationale,
+                access_principal_id=actor,
+            )
+        except PermissionError as exc:
+            raise HTTPException(status_code=403, detail="response approval authorization denied") from exc
+        except (KeyError, ValueError) as exc:
+            raise HTTPException(status_code=409, detail="response approval rejected") from exc
+        except Exception as exc:
+            LOGGER.error("hosted live response approval failed closed: %s", type(exc).__name__)
+            raise HTTPException(status_code=503, detail="live response approval unavailable") from exc
+        return proposal.model_dump(mode="json", by_alias=True)
 
     @app.get("/findings/{finding_id}")
     def hosted_finding(
@@ -856,6 +1321,63 @@ class HostedWorkflowExecutionRequest(BaseModel):
     target_snapshot_id: str = Field(min_length=1, max_length=128)
     target_snapshot_sha256: str = Field(min_length=64, max_length=64, pattern=r"^[0-9a-f]{64}$")
     target_source_identity: str = Field(min_length=1, max_length=4000)
+
+
+class LiveHuntRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    hypothesis: HuntHypothesis
+    plan: HuntPlan
+
+
+class LiveIncidentHypothesisRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    scope: Scope
+    question: str = Field(min_length=1, max_length=2000)
+    source_signal_ids: list[str] = Field(min_length=1, max_length=128)
+    affected_entities: list[str] = Field(min_length=1, max_length=128)
+
+
+class LiveAdjudicationRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    supporting_claim_ids: list[str] = Field(min_length=1, max_length=128)
+    supporting_evidence_refs: list[str] = Field(min_length=1, max_length=128)
+    contradicting_claim_ids: list[str] = Field(default_factory=list, max_length=128)
+    contradicting_evidence_refs: list[str] = Field(default_factory=list, max_length=128)
+    observation_ids: list[str] = Field(default_factory=list, max_length=128)
+    reason: str = Field(min_length=1, max_length=2000)
+    severity: Severity
+    confidence: Confidence
+
+
+class LiveResponseProposalRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    incident_id: str = Field(min_length=1, max_length=128)
+    scope: Scope
+    action: ResponseAction
+    reason: str = Field(min_length=1, max_length=2000)
+    expected_impact: str = Field(min_length=1, max_length=2000)
+    risk: str = Field(min_length=1, max_length=2000)
+    rollback_plan: str = Field(min_length=1, max_length=2000)
+    expires_at: datetime
+
+    @field_validator("expires_at")
+    @classmethod
+    def _expires_at_aware(cls, value: datetime) -> datetime:
+        if value.tzinfo is None or value.utcoffset() is None:
+            raise ValueError("response proposal expiration must be timezone-aware")
+        return value.astimezone(UTC)
+
+
+class LiveApprovalRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    scope: Scope
+    decision: str = Field(pattern=r"^(approved|denied)$")
+    rationale: str = Field(default="", max_length=2000)
 
 
 def _engagement_view(engagement: Engagement) -> dict[str, Any]:

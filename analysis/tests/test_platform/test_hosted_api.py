@@ -12,7 +12,14 @@ from secscan.platform.hosted.identity import (
     InMemoryHumanMembershipStore,
     VerifiedHumanIdentity,
 )
-from secscan.platform.read_models import FirmSummaryReadModel
+from secscan.platform.read_models import (
+    CursorPage,
+    DetectionSignalReadModel,
+    FirmSummaryReadModel,
+    HuntReadModel,
+    IncidentReadModel,
+    ResponseProposalReadModel,
+)
 
 
 def _config() -> RuntimeConfig:
@@ -34,6 +41,7 @@ def _config() -> RuntimeConfig:
         frontend_origin="https://preview.example",
         service_environment="staging",
         observability_endpoint="https://otel.example",
+        live_recovery_access_principal_id="PRN-HOSTED-LIVE-RECOVERY",
     )
 
 
@@ -64,6 +72,22 @@ class _Reads:
             audit_events=0,
             data_mode="HOSTED_INTEGRATED",
         )
+
+    def list_detection_signals(self, *, identity: VerifiedHumanIdentity, cursor: str | None = None, limit: int = 50):
+        assert identity.human_principal_id == "human-1"
+        return CursorPage[DetectionSignalReadModel](items=[], next_cursor=None, limit=limit)
+
+    def list_hunts(self, *, identity: VerifiedHumanIdentity, cursor: str | None = None, limit: int = 50):
+        assert identity.human_principal_id == "human-1"
+        return CursorPage[HuntReadModel](items=[], next_cursor=None, limit=limit)
+
+    def list_incidents(self, *, identity: VerifiedHumanIdentity, cursor: str | None = None, limit: int = 50):
+        assert identity.human_principal_id == "human-1"
+        return CursorPage[IncidentReadModel](items=[], next_cursor=None, limit=limit)
+
+    def list_response_proposals(self, *, identity: VerifiedHumanIdentity, cursor: str | None = None, limit: int = 50):
+        assert identity.human_principal_id == "human-1"
+        return CursorPage[ResponseProposalReadModel](items=[], next_cursor=None, limit=limit)
 
 
 class _Revocations:
@@ -142,3 +166,23 @@ def test_hosted_api_rejects_local_composition() -> None:
 def test_hosted_api_requires_application_tenant_access_service() -> None:
     with pytest.raises(HostedConfigurationError):
         create_app(runtime_config=_config(), identity_verifier=_Verifier(), read_model_service=_Reads())
+
+
+def test_hosted_v03_projection_routes_require_identity_and_use_canonical_reader() -> None:
+    client = TestClient(
+        create_app(
+            runtime_config=_config(),
+            identity_verifier=_Verifier(),
+            read_model_service=_Reads(),
+            human_access_service=HumanAccessService(
+                InMemoryHumanMembershipStore(
+                    [ClientMembership("human-1", "client-a", HumanRole.CLIENT_VIEWER)]
+                )
+            ),
+        )
+    )
+    for path in ("/detection/signals", "/hunts", "/incidents", "/response-proposals"):
+        assert client.get(path).status_code == 401
+        response = client.get(path, headers={"Authorization": "Bearer test-token"})
+        assert response.status_code == 200, response.text
+        assert response.json() == {"items": [], "next_cursor": None, "limit": 50}

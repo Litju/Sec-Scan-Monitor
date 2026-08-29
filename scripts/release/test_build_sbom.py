@@ -39,16 +39,21 @@ pywin32==312 ; sys_platform == 'win32' \\
             root = Path(raw_root)
             (root / "analysis").mkdir()
             (root / "apps" / "web").mkdir(parents=True)
+            (root / "apps" / "tui").mkdir(parents=True)
             (root / "analysis" / "requirements.lock").write_text("pydantic==2.0.0\n", encoding="utf-8")
             (root / "apps" / "web" / "package-lock.json").write_text(
                 json.dumps({"packages": {"": {}, "node_modules/react": {"name": "react", "version": "1.0.0"}}}),
+                encoding="utf-8",
+            )
+            (root / "apps" / "tui" / "package-lock.json").write_text(
+                json.dumps({"packages": {"": {}, "node_modules/opentui": {"name": "opentui", "version": "1.0.0"}}}),
                 encoding="utf-8",
             )
             first = MODULE.build_bom(root)
             second = MODULE.build_bom(root)
             self.assertEqual(first, second)
             self.assertEqual(first["bomFormat"], "CycloneDX")
-            self.assertEqual(len(first["components"]), 2)
+            self.assertEqual(len(first["components"]), 3)
 
 
 if __name__ == "__main__":

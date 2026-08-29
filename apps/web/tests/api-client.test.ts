@@ -40,6 +40,15 @@ describe("SecScan API mode boundary", () => {
     expect(fetchMock).toHaveBeenCalledWith("/api/secscan/health", expect.objectContaining({ cache: "no-store" }));
   });
 
+  it("binds an explicitly configured local principal to canonical requests", async () => {
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response(JSON.stringify({ status: "ok" }), { status: 200 }));
+    await createCanonicalClient({ mode: "LOCAL_INTEGRATED", principal: " PRN-TUI-OP ", baseUrl: "/api/secscan" }).get("/experience");
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/secscan/experience",
+      expect.objectContaining({ headers: { Accept: "application/json", "X-Secscan-Principal": "PRN-TUI-OP" } }),
+    );
+  });
+
   it("fails closed when hosted authentication is not configured", async () => {
     vi.stubEnv("NEXT_PUBLIC_NEON_AUTH_URL", "");
     await expect(createApiClient("HOSTED_INTEGRATED").health()).rejects.toMatchObject({ status: 503 });

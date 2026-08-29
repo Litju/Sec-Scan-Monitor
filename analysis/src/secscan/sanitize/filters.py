@@ -14,6 +14,8 @@ _IP_PATTERN = re.compile(r"\b(?:\d{1,3}\.){3}\d{1,3}\b")
 _FORBIDDEN_VALUE_PATTERNS = (
     re.compile(r"-----BEGIN [A-Z ]+PRIVATE KEY-----"),
     re.compile(r"AIza[0-9A-Za-z\-_]{35}"),
+    re.compile(r"(?i)github_pat_[A-Za-z0-9_]{20,}"),
+    re.compile(r"(?i)\bsk-[A-Za-z0-9]{20,}"),
     re.compile(r"(?i)bitlocker.*recovery"),
     re.compile(
         r"(?i)\b[a-z0-9_]*(?:password|passwd|pwd|api[_-]?key|apikey|secret|token|authorization)"

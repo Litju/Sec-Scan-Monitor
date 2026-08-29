@@ -1,0 +1,23 @@
+{
+  "name": "@secscanmonitor/tui",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "bun run src/index.tsx",
+    "build": "bun build src/index.tsx --outdir dist --target bun --external @opentui/core-darwin-x64 --external @opentui/core-darwin-arm64 --external @opentui/core-linux-x64 --external @opentui/core-linux-arm64 --external @opentui/core-linux-x64-musl --external @opentui/core-linux-arm64-musl --external @opentui/core-win32-arm64 --external @opentui/core-win32-x64",
+    "typecheck": "tsc --noEmit",
+    "test": "node --experimental-strip-types --test src/live.test.ts"
+  },
+  "dependencies": {
+    "@opentui/core": "0.5.8",
+    "@opentui/keymap": "0.5.8",
+    "@opentui/react": "0.5.8",
+    "react": "19.2.8"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "@types/react": "^19.2.0",
+    "typescript": "^6.0.0"
+  }
+}
