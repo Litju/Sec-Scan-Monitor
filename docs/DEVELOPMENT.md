@@ -1,6 +1,6 @@
 # Development
 
-## Python
+## Platform core
 
 ```bash
 cd analysis
@@ -10,7 +10,7 @@ python -m mypy src
 python -m ruff check src tests
 ```
 
-## Web
+## Web Command Center
 
 ```bash
 cd apps/web
@@ -21,7 +21,17 @@ npm run lint
 npm run build
 ```
 
-The default web mode is synthetic preview. Run the API and set `SECSCAN_API_URL` only when the local integration is intentionally configured. Do not use live credentials in tests.
+## OpenTUI Operator Console
+
+```bash
+cd apps/tui
+npm ci
+npm test
+npm run typecheck
+npm run build
+```
+
+The default safe evaluation mode may use synthetic preview data. Integrated live mode requires the documented PostgreSQL canonical store, repository-pinned OPA, API, and durable worker environment. Configure live endpoints outside version control and never use live credentials in tests.
 
 ## Change discipline
 

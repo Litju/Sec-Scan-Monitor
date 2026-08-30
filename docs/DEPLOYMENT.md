@@ -1,7 +1,17 @@
 # Deployment
 
-`IMPLEMENTED`: local/self-hosted composition can be assembled from the Python API, PostgreSQL adapter, optional OPA, optional Temporal, optional sandbox, and the web surface. Bind development services to loopback and provide configuration outside version control.
+## Local evaluation
 
-`NOT VALIDATED`: managed cloud hosting, multi-tenant production isolation, hosted identity, production object storage, production Temporal workers, autoscaling, public ingress, external model providers, and operational SLOs.
+The safe evaluation surface includes the Python platform/API, Web Command Center, and OpenTUI Operator Console. Synthetic preview state is available without claiming external or production operation. Bind development services to loopback and keep configuration outside version control.
 
-The public repository intentionally provides no production credentials, hosted provider project, deployment secret, or managed-cloud claim. A deployment proposal must add an engagement or architecture decision, qualification evidence, rollback, and an explicit go/no-go.
+## Integrated live v0.3
+
+The qualified reference composition uses PostgreSQL as canonical state, the repository-pinned real OPA adapter for governed `ResponseProposal` decisions, separate API and durable worker processes, and Web/OpenTUI consumers of shared canonical read models. Follow the repository development instructions and pin files; do not substitute an in-memory store or approval stub and claim the qualified topology.
+
+**RESPONSE EXECUTION IS NOT ENABLED.**
+
+## Not validated
+
+Managed cloud hosting, multi-tenant production isolation, hosted identity, production object storage, production workflow workers, autoscaling, public ingress, external model providers, and operational SLOs are not validated.
+
+The public repository provides no production credentials, hosted-provider project, deployment secret, or managed-cloud claim. A production deployment requires separate authority, qualification evidence, rollback, and explicit go/no-go. No production deployment is represented by this publication.

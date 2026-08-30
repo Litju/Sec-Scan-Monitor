@@ -5,86 +5,108 @@
 [![OpenSSF Scorecard](https://api.securityscorecards.dev/projects/github.com/Litju/Sec-Scan-Monitor/badge)](https://securityscorecards.dev/viewer/?uri=github.com/Litju/Sec-Scan-Monitor)
 [![License](https://img.shields.io/badge/license-source--available-5b6472.svg)](LICENSE)
 
-<p align="center">
-  <img src="apps/web/app/icon.svg" alt="SecScanMonitor product mark" width="128">
-</p>
+<p align="center"><img src="apps/web/app/icon.svg" alt="SecScanMonitor product mark" width="128"></p>
 
-> **SecScanMonitor is an evidence-first cybersecurity platform for AI agents, workflows, and agent-built software.**
+> **SecScanMonitor is an evidence-first autonomous cybersecurity firm platform for software, AI agents, MCP/A2A systems, workflows, and agent-built systems.**
 
-This repository is a source-visible/source-available publication. It is **not
-open source**. The restrictive evaluation license permits viewing, permitted
-cloning, and private execution of unmodified copies for non-production
-evaluation, testing, security research, or assessment of a potential
-commercial license. See LICENSE.
+It is not a chatbot, a generic SIEM, or an autonomous hacking agent. Security work remains contract-bound, evidence-grounded, advisory-first, and subject to explicit authority.
 
-## Platform scope
+This repository is **SOURCE-VISIBLE / SOURCE-AVAILABLE**. It is **NOT OPEN SOURCE**. The restrictive evaluation license permits viewing, permitted cloning, and private execution of unmodified copies for non-production evaluation, testing, security research, or assessment of a potential commercial license. See [LICENSE](LICENSE).
 
-SecScanMonitor keeps security work bounded, evidence-first, and advisory-first:
+## Current capabilities
 
-- **Cases and targets:** contract-bound engagements with explicit scope,
-  authority, and lifecycle state.
-- **Agent security:** inspection paths for agent-built systems, workflows, and
-  software without allowing an agent to self-authorize or create a finding.
-- **Policy and execution:** deterministic OPA decisions, capability manifests,
-  sandboxed execution boundaries, and refusal on missing authority.
-- **Evidence and adjudication:** provenance-backed evidence, observations,
-  claims, adjudication, Findings, and advisory reports.
-- **Security services:** generic extension contracts for AppSec, vulnerability
-  intelligence, supply-chain security, and other bounded specialist services.
-- **Product surfaces:** local APIs, controlled read models, a public UI, and
-  synthetic examples for safe evaluation.
+### Inspection
 
-The canonical chain is:
+- AppSec
+- Agent Security
+- Vulnerability Intelligence
+- Supply Chain
 
-    EvidenceObject -> Observation -> Claim -> Adjudication -> Finding -> Report
+### Continuous Security
 
-Agents produce claims with evidence references. Adjudication is the control
-point for authoritative Findings; incomplete evidence remains explicitly
-uncertain or not validated.
+- Security Graph and Security Event Plane
+- Continuous Patrol with no-change/no-noise semantics
+- MCP/A2A Agent Security Gateway and customer-side Edge Runner
+- restart/replay reconstruction from canonical state
 
-## Architecture
+### Detection & Response — v0.3
 
-The platform uses inward dependency direction:
+- authenticated, scope-bound security-event ingest into canonical PostgreSQL `SecurityEvent` records;
+- durable detection orchestration, bounded Sigma-compatible rules, `DetectionRun` records, and `Signal` records;
+- bounded correlation, Threat Hunting, and `IncidentHypothesis` records;
+- canonical evidence and claims, adjudication, and explicit Incident creation;
+- governed `ResponseProposal` records evaluated by real OPA and requiring human approval.
 
-    adapters -> application -> domain
+**RESPONSE EXECUTION IS NOT ENABLED.**
 
-PostgreSQL, OPA, Temporal, Docker sandboxing, object storage, and FastAPI are
-replaceable adapters around the platform contracts. The public UI defaults to a
-read-only synthetic preview. Hosted operation, live external systems, and
-production deployment are not validated by this publication.
+### Product surfaces
+
+The Web Command Center, OpenTUI Operator Console, and API consume shared canonical state. Preview data remains available for safe evaluation, but it is not the qualified live topology.
+
+## Canonical chains
+
+Inspection:
+
+```text
+Evidence -> Observation -> Claim -> Adjudication -> Finding -> Report
+```
+
+Detection & Response:
+
+```text
+External Security Source -> SecurityEvent -> DetectionRun -> Signal
+-> Correlation / Hunt -> IncidentHypothesis -> Observation / Claim
+-> Adjudication -> Incident -> ResponseProposal -> OPA -> Human Approval
+```
+
+Signal != Incident. Tool output != truth. ATT&CK/ATLAS mapping != proof. LLM != authority. Approval != execution.
+
+## v0.3 qualification status
+
+The v0.3 system was qualified with controlled synthetic live telemetry using real network transport, PostgreSQL, repository-pinned OPA, separate producer, API, and worker processes, MCP/A2A, Edge Runner, Web, and OpenTUI.
+
+The campaign qualified a benign no-noise baseline; endpoint, cloud/identity, and agent/MCP scenarios; correlation; Hunt; Incident adjudication; `ResponseProposal`; restart/replay; cross-tenant and cross-case denial; failure injection; and integrated Web/TUI operation. This is controlled qualification evidence, not customer production validation.
+
+Limitations: there is no production deployment, formal release or tag, response executor, or DFIR capability. Sigma compatibility is a bounded subset. Performance figures are qualification-only and are not product benchmarks.
 
 ## Run it locally
 
 ### Platform core
 
-    cd analysis
-    python -m venv .venv
-    python -m pip install -e '.[dev]'
-    python -m pytest -q
-    python -m mypy src
-    python -m ruff check src tests
+```bash
+cd analysis
+python -m venv .venv
+python -m pip install -e '.[dev]'
+python -m pytest -q
+python -m mypy src
+python -m ruff check src tests
+```
 
-### Web surface
+### Web Command Center
 
-    cd apps/web
-    npm ci
-    npm test
-    npm run typecheck
-    npm run lint
-    npm run build
+```bash
+cd apps/web
+npm ci
+npm test
+npm run typecheck
+npm run lint
+npm run build
+```
 
-The web application uses synthetic, non-personal, non-client data by default.
-Read docs/DEVELOPMENT.md for the local loop and docs/SECURITY_MODEL.md for the
-security boundary.
+### OpenTUI Operator Console
+
+```bash
+cd apps/tui
+npm ci
+npm test
+npm run typecheck
+npm run build
+```
+
+The default safe evaluation mode may use synthetic preview data. Integrated live mode requires the documented PostgreSQL, repository-pinned OPA, API, and worker environment. See [Development](docs/DEVELOPMENT.md) and the [Security model](docs/SECURITY_MODEL.md).
 
 ## Public boundary
 
-The public tree is an exact, deterministic export. It contains generic
-platform code, public contracts, synthetic examples, and security controls. It
-does not contain client material, raw evidence, credentials, private history,
-or private qualification artifacts. Unknown files and secret-like or
-path-identifying content fail the export.
+The public tree is an exact, deterministic export. It contains generic platform code, public contracts, synthetic examples, and security controls. It does not contain client material, raw evidence, credentials, private history, or private qualification artifacts. Unknown files and secret-like or path-identifying content fail the export.
 
-Issues and security reports may be accepted, but external source-code
-contributions require separate written authorization. See CONTRIBUTING.md and
-SECURITY.md.
+Issues and security reports may be accepted, but external source-code contributions require separate written authorization. See [CONTRIBUTING.md](CONTRIBUTING.md) and [SECURITY.md](SECURITY.md).
