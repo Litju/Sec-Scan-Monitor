@@ -33,6 +33,6 @@ jobs:
           path: dist/secscanmonitor.cdx.json
           if-no-files-found: error
       - name: Attest SBOM provenance
-        uses: actions/attest@67422f5511b7ff725f4dbd6fb9bd2cd925c65a8d
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6
         with:
           subject-path: dist/secscanmonitor.cdx.json
