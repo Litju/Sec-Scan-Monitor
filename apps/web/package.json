@@ -28,7 +28,7 @@
     "@base-ui/react": "1.7.0",
     "@secscanmonitor/client": "file:../../packages/secscan-client",
     "@secscanmonitor/experience-contracts": "file:../../packages/secscan-experience-contracts",
-    "@neondatabase/auth": "0.5.0-beta",
+    "@neondatabase/auth": "0.7.0-beta",
     "@open-policy-agent/opa-wasm": "1.10.0",
     "@streamdown/cjk": "^1.0.3",
     "@streamdown/code": "^1.1.1",
